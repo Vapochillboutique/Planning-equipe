@@ -223,6 +223,24 @@ function Login({onLogin}) {
   );
 }
 
+// ── Génération des créneaux 10h00 → 19h30 par pas de 15 min ──────────────────
+const TIME_SLOTS = [];
+for (let h = 10; h <= 19; h++) {
+  const maxMin = (h === 19) ? 30 : 45;
+  for (let m = 0; m <= maxMin; m += 15) {
+    TIME_SLOTS.push(`${String(h).padStart(2,'0')}h${m===0?'00':m}`);
+  }
+}
+// Formater pour affichage : "10h00" → "10h00"
+const fmtTime = t => t; // déjà lisible
+
+// Construire la valeur finale "10h00/19h30"
+const buildVal = (debut, fin, lieu) => {
+  if (!debut || !fin) return lieu || "";
+  if (lieu) return `${lieu} ${debut}/${fin}`;
+  return `${debut}/${fin}`;
+};
+
 // ── Composant principal ───────────────────────────────────────────────────────
 function App() {
   const today = new Date();
@@ -237,10 +255,22 @@ function App() {
   const [calMonth, setCalMonth]     = React.useState(today.getMonth());
   const [calYear,  setCalYear]      = React.useState(today.getFullYear());
   const [modal, setModal]           = React.useState(null);
-  const [mVal, setMVal]             = React.useState("");
-  const [mHS,  setMHS]              = React.useState(0);
-  const [mCustom, setMCustom]       = React.useState("");
-  const [newName, setNewName]       = React.useState("");
+  const [mLieu,    setMLieu]        = React.useState("");
+  const [mAbsence, setMAbsence]     = React.useState("");
+  const [mDebut,   setMDebut]       = React.useState("");
+  const [mFin,     setMFin]         = React.useState("");
+  const [mHS,      setMHS]          = React.useState(0);
+  const [newName,  setNewName]      = React.useState("");
+  const [conges, setConges]         = React.useState([]);
+  // États pour le formulaire congé
+  const [cgEmpId,  setCgEmpId]  = React.useState("");
+  const [cgType,   setCgType]   = React.useState("Congé");
+  const [cgDebut,  setCgDebut]  = React.useState("");
+  const [cgFin,    setCgFin]    = React.useState("");
+  const [cgNote,   setCgNote]   = React.useState("");
+  const [cgYear,   setCgYear]   = React.useState(new Date().getFullYear());
+  const [cgMonth,  setCgMonth]  = React.useState(new Date().getMonth());
+  const [cgSelect, setCgSelect] = React.useState(null);
   const [recapMonth, setRecapMonth] = React.useState(today.getMonth());
   const [recapYear,  setRecapYear]  = React.useState(today.getFullYear());
 
@@ -259,13 +289,14 @@ function App() {
     if (d) {
       if (d.employees) setEmployees(d.employees);
       if (d.cells)     setCells(d.cells);
+      if (d.conges)    setConges(d.conges);
     }
   }, []);
 
   // Sauvegarder données planning
   React.useEffect(() => {
-    save({employees, cells});
-  }, [employees, cells]);
+    save({employees, cells, conges});
+  }, [employees, cells, conges]);
 
   const weekDays = React.useMemo(() => getWeekDays(monday), [monday]);
 
@@ -278,16 +309,31 @@ function App() {
   const openModal = (empId, date, dayIdx) => {
     const k = dk(date);
     const c = (cells[empId]||{})[k] || {};
-    setMVal(c.val||"");
+    const val = c.val || "";
+    // Parser la valeur existante
+    const absFound = ABSENCES.find(a => val.toUpperCase().startsWith(a.toUpperCase()));
+    const lieuFound = LIEUX.find(l => val.toUpperCase().startsWith(l.toUpperCase()));
+    const reTime = /(\d{1,2}h\d{0,2})\s*\/\s*(\d{1,2}h\d{0,2})/i;
+    const m = val.match(reTime);
+    setMAbsence(absFound || "");
+    setMLieu(lieuFound || "");
+    setMDebut(m ? m[1] : "");
+    setMFin(m ? m[2] : "");
     setMHS(c.hsupp||0);
-    setMCustom("");
     setModal({empId, date, k, dayIdx});
   };
 
   const saveModal = () => {
     if (!modal) return;
     const {empId, k} = modal;
-    const finalVal = mVal==="__custom__" ? mCustom : mVal;
+    let finalVal = "";
+    if (mAbsence) {
+      finalVal = mAbsence;
+    } else if (mDebut && mFin) {
+      finalVal = mLieu ? `${mLieu} ${mDebut}/${mFin}` : `${mDebut}/${mFin}`;
+    } else if (mLieu) {
+      finalVal = mLieu;
+    }
     setCells(prev => {
       const n = {...prev, [empId]: {...(prev[empId]||{})}};
       if (finalVal || Number(mHS)>0) {
@@ -308,6 +354,7 @@ function App() {
       delete n[empId][k];
       return n;
     });
+    setMLieu(''); setMAbsence(''); setMDebut(''); setMFin(''); setMHS(0);
     setModal(null);
   };
 
@@ -848,70 +895,391 @@ function App() {
     const emp = employees.find(e=>e.id===modal.empId);
     const es = empStyle(employees.findIndex(e=>e.id===modal.empId));
     const d = modal.date;
-    const isShowCustom = mVal==="__custom__";
+
+    // Calcul durée aperçu
+    const calcDuree = () => {
+      if (!mDebut || !mFin) return null;
+      const toMin = t => { const [h,m] = t.replace('h',':').split(':'); return parseInt(h)*60+(parseInt(m)||0); };
+      const diff = toMin(mFin) - toMin(mDebut);
+      if (diff <= 0) return null;
+      const net = diff > 360 ? diff - 60 : diff;
+      return Math.round(net/60*10)/10;
+    };
+    const duree = calcDuree();
+
+    const selStyle = {flex:1, border:'1.5px solid #e5e7eb', borderRadius:9, padding:'9px 8px', fontSize:13, color:'#1a1a2e', background:'#f8f9fa', cursor:'pointer'};
+
     return (
       <div onClick={e=>e.target===e.currentTarget&&setModal(null)}
         style={{position:'fixed',inset:0,background:'#00000055',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,backdropFilter:'blur(3px)'}}>
-        <div style={{background:'#fff',borderRadius:16,padding:28,width:400,maxWidth:'calc(100vw - 32px)',boxShadow:'0 20px 60px #0003',border:'1px solid #e5e7eb'}}>
-          <div style={{fontSize:15,fontWeight:800,color:'#1a1a2e',marginBottom:4}}>
+        <div style={{background:'#fff',borderRadius:16,padding:28,width:420,maxWidth:'calc(100vw - 32px)',boxShadow:'0 20px 60px #0003',border:'1px solid #e5e7eb'}}>
+
+          {/* Titre */}
+          <div style={{fontSize:15,fontWeight:800,color:'#1a1a2e',marginBottom:2}}>
             <span style={{color:es.accent}}>●</span> {emp?.name}
           </div>
-          <div style={{fontSize:12,color:'#888',marginBottom:20}}>
-            {JOURS[modal.dayIdx]} {frDate(d)}
-          </div>
+          <div style={{fontSize:12,color:'#888',marginBottom:20}}>{JOURS[modal.dayIdx]} {frDate(d)}</div>
 
-          {/* Saisie horaires */}
-          <label style={lbl}>Horaires ou statut</label>
-          <input
-            value={isShowCustom ? mCustom : mVal}
-            onChange={e => {
-              if (isShowCustom) setMCustom(e.target.value);
-              else { setMVal(e.target.value); }
-            }}
-            placeholder="ex: 10h/18h ou 10h30/19h30"
-            style={{...inputSt, marginBottom:10}}
-          />
-
-          {/* Presets */}
+          {/* ── Lieu de travail ── */}
+          <div style={{fontSize:11,color:'#888',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:8}}>Lieu de travail</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:16}}>
-            {/* Lieux */}
-            <div style={{width:'100%',fontSize:10,color:'#aaa',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:2}}>Lieux de travail</div>
-            {LIEUX.map(p=>(
-              <button key={p} onClick={()=>{setMVal(p);}}
-                style={{padding:'4px 10px',borderRadius:20,border:`1px solid ${mVal===p?'#1a6ed8':'#ddd'}`,background:mVal===p?'#1a6ed8':'#f8f8f8',color:mVal===p?'#fff':'#555',fontWeight:600,fontSize:12,cursor:'pointer'}}>
-                {p}
-              </button>
-            ))}
-            <div style={{width:'100%',fontSize:10,color:'#aaa',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:2,marginTop:6}}>Absences</div>
-            {ABSENCES.map(p=>(
-              <button key={p} onClick={()=>{setMVal(p);}}
-                style={{padding:'4px 10px',borderRadius:20,border:`1px solid ${mVal===p?'#d63384':'#ddd'}`,background:mVal===p?'#d63384':'#f8f8f8',color:mVal===p?'#fff':'#555',fontWeight:600,fontSize:12,cursor:'pointer'}}>
-                {p}
+            {LIEUX.map(l=>(
+              <button key={l} onClick={()=>{setMLieu(l===mLieu?'':l); setMAbsence('');}}
+                style={{padding:'6px 12px',borderRadius:20,border:`1.5px solid ${mLieu===l?'#1a6ed8':'#e5e7eb'}`,background:mLieu===l?'#1a6ed8':'#fff',color:mLieu===l?'#fff':'#555',fontWeight:600,fontSize:12,cursor:'pointer'}}>
+                {l}
               </button>
             ))}
           </div>
 
-          {/* Heures supp */}
-          <label style={lbl}>Heures supplémentaires ce jour ⚡</label>
-          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:20}}>
+          {/* ── Sélecteur horaire ── */}
+          {!mAbsence && (
+            <>
+              <div style={{fontSize:11,color:'#888',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:8}}>Horaires ⏱</div>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+                <select value={mDebut} onChange={e=>{setMDebut(e.target.value); if(!mFin||e.target.value>=mFin) setMFin('');}} style={selStyle}>
+                  <option value="">Début</option>
+                  {TIME_SLOTS.map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
+                <span style={{color:'#aaa',fontWeight:700,fontSize:16}}>→</span>
+                <select value={mFin} onChange={e=>setMFin(e.target.value)} style={selStyle}>
+                  <option value="">Fin</option>
+                  {TIME_SLOTS.filter(t=>!mDebut||t>mDebut).map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              {/* Aperçu durée */}
+              {duree && (
+                <div style={{background:'#f0f8ff',borderRadius:8,padding:'8px 12px',marginBottom:14,fontSize:12,color:'#1a6ed8',border:'1px solid #cce5ff',display:'flex',alignItems:'center',gap:6}}>
+                  ⏱ <strong>{mDebut} → {mFin}</strong> = <strong>{duree}h</strong> travaillées
+                  <span style={{color:'#aaa',fontSize:11}}>(pause déduite si +6h)</span>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── Absences ── */}
+          <div style={{fontSize:11,color:'#888',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:8,marginTop:4}}>Absence / Congé</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:16}}>
+            {ABSENCES.map(a=>(
+              <button key={a} onClick={()=>{setMAbsence(a===mAbsence?'':a); if(a!==mAbsence){setMLieu('');setMDebut('');setMFin('');}}}
+                style={{padding:'6px 12px',borderRadius:20,border:`1.5px solid ${mAbsence===a?'#d63384':'#e5e7eb'}`,background:mAbsence===a?'#d63384':'#fff',color:mAbsence===a?'#fff':'#555',fontWeight:600,fontSize:12,cursor:'pointer'}}>
+                {a}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Heures supp ── */}
+          <div style={{fontSize:11,color:'#888',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:8}}>Heures supplémentaires ⚡</div>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:22}}>
             <input type="number" min={0} max={12} step={0.5} value={mHS} onChange={e=>setMHS(e.target.value)}
-              style={{...inputSt,width:90,marginBottom:0}}/>
-            <span style={{color:'#888',fontSize:12}}>heures supplémentaires</span>
+              style={{width:80,border:'1.5px solid #e5e7eb',borderRadius:9,padding:'9px 10px',fontSize:14,color:'#1a1a2e',background:'#f8f9fa',textAlign:'center'}}/>
+            <span style={{color:'#888',fontSize:12}}>h supplémentaires ce jour</span>
           </div>
 
-          {/* Aperçu calcul */}
-          {mVal && !isAbsence(mVal) && parseHeures(mVal)>0 && (
-            <div style={{background:'#f0f8ff',borderRadius:8,padding:'8px 12px',marginBottom:16,fontSize:12,color:'#1a6ed8',border:'1px solid #cce5ff'}}>
-              ⏱ Durée calculée : <strong>{parseHeures(mVal)}h</strong>
-              {mHS>0&&<> + <strong>{mHS}h supp</strong> = <strong>{Math.round((parseHeures(mVal)+Number(mHS))*10)/10}h</strong></>}
-              <span style={{color:'#999',marginLeft:6}}>(pause déduite si &gt;6h)</span>
+          {/* ── Résumé ── */}
+          {(mLieu||mAbsence||mDebut) && (
+            <div style={{background:'#f8f9fa',borderRadius:8,padding:'8px 12px',marginBottom:16,fontSize:12,color:'#555',border:'1px solid #e5e7eb'}}>
+              📋 Sera enregistré : <strong style={{color:'#1a1a2e'}}>
+                {mAbsence || (mLieu&&mDebut&&mFin ? `${mLieu} ${mDebut}/${mFin}` : mLieu||(mDebut&&mFin?`${mDebut}/${mFin}`:''))}
+              </strong>
+              {mHS>0 && <span style={{color:'#f57c00'}}> + ⚡{mHS}h supp</span>}
             </div>
           )}
 
+          {/* ── Boutons ── */}
           <div style={{display:'flex',gap:8}}>
-            <button onClick={saveModal} style={{flex:1,padding:'10px 0',borderRadius:8,border:'none',background:'#1a6ed8',color:'#fff',fontWeight:700,fontSize:14,cursor:'pointer'}}>✓ Enregistrer</button>
-            <button onClick={clearModal} style={{padding:'10px 14px',borderRadius:8,border:'1px solid #f8d7da',background:'#fce8e8',color:'#d63384',fontWeight:700,fontSize:13,cursor:'pointer'}}>✕ Effacer</button>
-            <button onClick={()=>setModal(null)} style={{padding:'10px 14px',borderRadius:8,border:'1px solid #ddd',background:'#f8f8f8',color:'#888',fontWeight:600,fontSize:13,cursor:'pointer'}}>Annul.</button>
+            <button onClick={saveModal} style={{flex:1,padding:'11px 0',borderRadius:9,border:'none',background:'#1a6ed8',color:'#fff',fontWeight:800,fontSize:14,cursor:'pointer'}}>✓ Enregistrer</button>
+            <button onClick={()=>{clearModal();}} style={{padding:'11px 14px',borderRadius:9,border:'1px solid #f8d7da',background:'#fce8e8',color:'#d63384',fontWeight:700,fontSize:13,cursor:'pointer'}}>✕ Effacer</button>
+            <button onClick={()=>setModal(null)} style={{padding:'11px 14px',borderRadius:9,border:'1px solid #ddd',background:'#f8f8f8',color:'#888',fontWeight:600,fontSize:13,cursor:'pointer'}}>Annuler</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── CONGÉS VIEW ───────────────────────────────────────────────────────────
+  const renderConges = () => {
+    const TYPES_CG = ["Congé","RTT","Maladie","OFF/Férié","Absence"];
+    const CG_COLORS = {"Congé":"#10b981","RTT":"#6366f1","Maladie":"#ef4444","OFF/Férié":"#f59e0b","Absence":"#94a3b8"};
+
+    // Jours du mois pour le calendrier
+    const firstDay = new Date(cgYear, cgMonth, 1);
+    const lastDay  = new Date(cgYear, cgMonth+1, 0);
+    const startWD  = firstDay.getDay()===0?6:firstDay.getDay()-1; // décalage lundi=0
+    const totalCells = startWD + lastDay.getDate();
+    const rows = Math.ceil(totalCells/7);
+
+    const navCg = dir => {
+      let m=cgMonth+dir, y=cgYear;
+      if(m<0){m=11;y--;} if(m>11){m=0;y++;}
+      setCgMonth(m); setCgYear(y);
+    };
+
+    // Congés du mois affiché
+    const congesDuMois = conges.filter(cg => {
+      const d1 = new Date(cg.debut), d2 = new Date(cg.fin);
+      return d1 <= lastDay && d2 >= firstDay;
+    });
+
+    // Quels employés ont un congé sur un jour donné
+    const getCongesJour = (day) => {
+      const d = new Date(cgYear, cgMonth, day);
+      return conges.filter(cg => {
+        const d1=new Date(cg.debut), d2=new Date(cg.fin);
+        return d >= d1 && d <= d2;
+      });
+    };
+
+    // Sélection de plage de dates
+    const [selStart, setSelStart] = React.useState(null);
+    const [selEnd,   setSelEnd]   = React.useState(null);
+    const [hovDay,   setHovDay]   = React.useState(null);
+
+    const clickDay = (day) => {
+      if (!isAdmin) return;
+      const dStr = `${cgYear}-${pad(cgMonth+1)}-${pad(day)}`;
+      if (!selStart || (selStart && selEnd)) {
+        setSelStart(dStr); setSelEnd(null);
+      } else {
+        if (dStr < selStart) { setSelEnd(selStart); setSelStart(dStr); }
+        else { setSelEnd(dStr); }
+        // auto-remplir le formulaire
+        setCgDebut(selStart < dStr ? selStart : dStr);
+        setCgFin(selStart < dStr ? dStr : selStart);
+      }
+    };
+
+    const isInRange = (day) => {
+      const dStr = `${cgYear}-${pad(cgMonth+1)}-${pad(day)}`;
+      if (selStart && selEnd) return dStr >= selStart && dStr <= selEnd;
+      if (selStart && hovDay) {
+        const lo = selStart<hovDay?selStart:hovDay;
+        const hi = selStart<hovDay?hovDay:selStart;
+        return dStr >= lo && dStr <= hi;
+      }
+      return false;
+    };
+
+    const addConge = () => {
+      if (!cgEmpId || !cgDebut || !cgFin) return;
+      const newCg = {id:'cg'+Date.now(), empId:cgEmpId, type:cgType, debut:cgDebut, fin:cgFin, note:cgNote};
+      setConges(prev=>[...prev, newCg]);
+      setCgDebut(''); setCgFin(''); setCgNote(''); setSelStart(null); setSelEnd(null);
+    };
+
+    const delConge = (id) => setConges(prev=>prev.filter(c=>c.id!==id));
+
+    // Jours ouvrés dans une plage
+    const jouvresRange = (debut, fin) => {
+      let d=new Date(debut), count=0;
+      const end=new Date(fin);
+      while(d<=end){const wd=d.getDay();if(wd!==0&&wd!==6)count++;d.setDate(d.getDate()+1);}
+      return count;
+    };
+
+    const frDateStr = s => new Date(s+'T12:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'});
+
+    return (
+      <div>
+        <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:20,flexWrap:'wrap'}}>
+          <h2 style={{fontSize:22,fontWeight:800,color:'#1a1a2e'}}>🏖️ Gestion des congés</h2>
+          <div style={{fontSize:12,color:'#aaa'}}>{conges.length} congé(s) enregistré(s)</div>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 340px',gap:20,alignItems:'start',flexWrap:'wrap'}}>
+
+          {/* ── CALENDRIER VISUEL ── */}
+          <div style={{background:'#fff',borderRadius:14,padding:20,boxShadow:'0 2px 12px #0001',border:'1px solid #e5e7eb'}}>
+            {/* Nav mois */}
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+              <button onClick={()=>navCg(-1)} style={{...bSLocal,padding:'6px 14px'}}>‹</button>
+              <span style={{fontSize:16,fontWeight:800,color:'#1a1a2e',textTransform:'capitalize'}}>
+                {new Date(cgYear,cgMonth,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'})}
+              </span>
+              <button onClick={()=>navCg(1)} style={{...bSLocal,padding:'6px 14px'}}>›</button>
+            </div>
+
+            {/* Jours de la semaine */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>
+              {['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(j=>(
+                <div key={j} style={{textAlign:'center',fontSize:11,fontWeight:700,color:'#aaa',padding:'4px 0'}}>{j}</div>
+              ))}
+            </div>
+
+            {/* Grille jours */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:3}}>
+              {Array.from({length:rows*7},(_,i)=>{
+                const day = i - startWD + 1;
+                const valid = day>=1 && day<=lastDay.getDate();
+                const dStr = valid ? `${cgYear}-${pad(cgMonth+1)}-${pad(day)}` : '';
+                const dObj = valid ? new Date(cgYear,cgMonth,day) : null;
+                const isWE = dObj && (dObj.getDay()===0||dObj.getDay()===6);
+                const isToday = dStr===dk(today);
+                const cgsJour = valid ? getCongesJour(day) : [];
+                const inRange = valid && isInRange(day);
+                const isSelStart = dStr===selStart;
+                const isSelEnd   = dStr===selEnd;
+
+                return (
+                  <div key={i}
+                    onClick={()=>valid&&!isWE&&clickDay(day)}
+                    onMouseEnter={()=>valid&&selStart&&!selEnd&&setHovDay(dStr)}
+                    onMouseLeave={()=>setHovDay(null)}
+                    style={{
+                      minHeight:56, borderRadius:8, padding:'4px 3px',
+                      background: isSelStart||isSelEnd ? '#1a6ed8' : inRange ? '#dbeafe' : isWE ? '#f8f8f8' : isToday ? '#eff6ff' : '#fff',
+                      border: isToday ? '2px solid #1a6ed8' : '1px solid #f0f0f0',
+                      cursor: valid&&!isWE&&isAdmin ? 'pointer' : 'default',
+                      opacity: !valid ? 0 : 1,
+                      transition: 'background 0.1s',
+                    }}
+                  >
+                    {valid && (
+                      <>
+                        <div style={{fontSize:12,fontWeight:isToday?800:600,color:isSelStart||isSelEnd?'#fff':isWE?'#ccc':'#333',textAlign:'center',marginBottom:2}}>{day}</div>
+                        <div style={{display:'flex',flexDirection:'column',gap:1}}>
+                          {cgsJour.slice(0,3).map(cg=>{
+                            const emp=employees.find(e=>e.id===cg.empId);
+                            const es=empStyle(employees.findIndex(e=>e.id===cg.empId));
+                            return (
+                              <div key={cg.id} style={{fontSize:8,fontWeight:700,color:'#fff',background:es.accent,borderRadius:3,padding:'1px 3px',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>
+                                {emp?.name.slice(0,6)}
+                              </div>
+                            );
+                          })}
+                          {cgsJour.length>3&&<div style={{fontSize:8,color:'#aaa'}}>+{cgsJour.length-3}</div>}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {isAdmin && (
+              <div style={{marginTop:10,fontSize:11,color:'#aaa',textAlign:'center'}}>
+                {!selStart ? '👆 Cliquez sur un jour de début' : !selEnd ? '👆 Cliquez sur le jour de fin' : `✅ Plage sélectionnée : ${frDateStr(selStart)} → ${frDateStr(selEnd)}`}
+              </div>
+            )}
+
+            {/* Légende employés */}
+            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:14,paddingTop:14,borderTop:'1px solid #f0f0f0'}}>
+              {employees.map((emp,ei)=>{
+                const es=empStyle(ei);
+                const nbCg=conges.filter(c=>c.empId===emp.id).length;
+                return (
+                  <span key={emp.id} style={{background:es.accent+'22',color:es.accent,border:`1px solid ${es.accent}55`,borderRadius:6,padding:'3px 8px',fontSize:11,fontWeight:700}}>
+                    {emp.name} {nbCg>0?`· ${nbCg} congé(s)`:''}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── PANNEAU DROIT ── */}
+          <div style={{display:'flex',flexDirection:'column',gap:14}}>
+
+            {/* Formulaire ajout */}
+            {isAdmin && (
+              <div style={{background:'#fff',borderRadius:14,padding:20,boxShadow:'0 2px 12px #0001',border:'1px solid #e5e7eb'}}>
+                <div style={{fontSize:14,fontWeight:800,color:'#1a1a2e',marginBottom:16}}>➕ Ajouter un congé</div>
+
+                <div style={{fontSize:11,color:'#888',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:6}}>Collaborateur</div>
+                <select value={cgEmpId} onChange={e=>setCgEmpId(e.target.value)}
+                  style={{width:'100%',border:'1.5px solid #e5e7eb',borderRadius:9,padding:'9px 10px',fontSize:13,marginBottom:12,background:'#f8f9fa',color:'#1a1a2e'}}>
+                  <option value="">— Choisir —</option>
+                  {employees.map(emp=><option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                </select>
+
+                <div style={{fontSize:11,color:'#888',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:6}}>Type</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:5,marginBottom:12}}>
+                  {TYPES_CG.map(t=>(
+                    <button key={t} onClick={()=>setCgType(t)}
+                      style={{padding:'5px 10px',borderRadius:20,border:`1.5px solid ${cgType===t?CG_COLORS[t]:'#e5e7eb'}`,background:cgType===t?CG_COLORS[t]+'22':'#fff',color:cgType===t?CG_COLORS[t]:'#666',fontWeight:700,fontSize:11,cursor:'pointer'}}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
+                  <div>
+                    <div style={{fontSize:11,color:'#888',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:5}}>Début</div>
+                    <input type="date" value={cgDebut} onChange={e=>setCgDebut(e.target.value)}
+                      style={{width:'100%',border:'1.5px solid #e5e7eb',borderRadius:9,padding:'8px 10px',fontSize:13,background:'#f8f9fa',color:'#1a1a2e'}}/>
+                  </div>
+                  <div>
+                    <div style={{fontSize:11,color:'#888',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:5}}>Fin</div>
+                    <input type="date" value={cgFin} onChange={e=>setCgFin(e.target.value)} min={cgDebut}
+                      style={{width:'100%',border:'1.5px solid #e5e7eb',borderRadius:9,padding:'8px 10px',fontSize:13,background:'#f8f9fa',color:'#1a1a2e'}}/>
+                  </div>
+                </div>
+
+                {cgDebut && cgFin && (
+                  <div style={{background:'#f0f8ff',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'#1a6ed8',border:'1px solid #cce5ff'}}>
+                    📅 {jouvresRange(cgDebut+'T12:00', cgFin+'T12:00')} jours ouvrés · {frDateStr(cgDebut)} → {frDateStr(cgFin)}
+                  </div>
+                )}
+
+                <div style={{fontSize:11,color:'#888',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:5}}>Note (optionnel)</div>
+                <input value={cgNote} onChange={e=>setCgNote(e.target.value)} placeholder="Ex: Vacances été..."
+                  style={{width:'100%',border:'1.5px solid #e5e7eb',borderRadius:9,padding:'8px 10px',fontSize:13,background:'#f8f9fa',color:'#1a1a2e',marginBottom:14}}/>
+
+                <button onClick={addConge} disabled={!cgEmpId||!cgDebut||!cgFin}
+                  style={{width:'100%',padding:'11px 0',borderRadius:9,border:'none',background:cgEmpId&&cgDebut&&cgFin?'#1a6ed8':'#e5e7eb',color:cgEmpId&&cgDebut&&cgFin?'#fff':'#aaa',fontWeight:800,fontSize:14,cursor:cgEmpId&&cgDebut&&cgFin?'pointer':'default'}}>
+                  ✓ Enregistrer le congé
+                </button>
+              </div>
+            )}
+
+            {/* Liste congés */}
+            <div style={{background:'#fff',borderRadius:14,padding:20,boxShadow:'0 2px 12px #0001',border:'1px solid #e5e7eb'}}>
+              <div style={{fontSize:14,fontWeight:800,color:'#1a1a2e',marginBottom:14}}>📋 Congés enregistrés</div>
+              {conges.length===0 ? (
+                <div style={{color:'#ccc',fontSize:13,textAlign:'center',padding:'20px 0'}}>Aucun congé enregistré</div>
+              ) : (
+                [...conges].sort((a,b)=>a.debut.localeCompare(b.debut)).map(cg=>{
+                  const emp=employees.find(e=>e.id===cg.empId);
+                  const es=empStyle(employees.findIndex(e=>e.id===cg.empId));
+                  const jours=jouvresRange(cg.debut+'T12:00', cg.fin+'T12:00');
+                  const color=CG_COLORS[cg.type]||'#94a3b8';
+                  return (
+                    <div key={cg.id} style={{display:'flex',alignItems:'flex-start',gap:10,padding:'10px 12px',background:'#f8f9fa',borderRadius:10,marginBottom:8,border:`1px solid ${es.accent}33`,borderLeft:`4px solid ${es.accent}`}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
+                          <span style={{fontWeight:700,fontSize:13,color:es.accent}}>● {emp?.name||'?'}</span>
+                          <span style={{background:color+'22',color,border:`1px solid ${color}55`,borderRadius:5,padding:'1px 6px',fontSize:10,fontWeight:700}}>{cg.type}</span>
+                          <span style={{fontSize:10,color:'#aaa',fontWeight:600}}>{jours}j ouvrés</span>
+                        </div>
+                        <div style={{fontSize:11,color:'#666'}}>{frDateStr(cg.debut)} → {frDateStr(cg.fin)}</div>
+                        {cg.note&&<div style={{fontSize:11,color:'#aaa',fontStyle:'italic',marginTop:2}}>{cg.note}</div>}
+                      </div>
+                      {isAdmin && (
+                        <button onClick={()=>delConge(cg.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',fontSize:15,padding:'2px 4px',flexShrink:0}}>✕</button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Stats par employé */}
+            <div style={{background:'#fff',borderRadius:14,padding:20,boxShadow:'0 2px 12px #0001',border:'1px solid #e5e7eb'}}>
+              <div style={{fontSize:14,fontWeight:800,color:'#1a1a2e',marginBottom:14}}>📊 Solde par collaborateur</div>
+              {employees.map((emp,ei)=>{
+                const es=empStyle(ei);
+                const myCgs=conges.filter(c=>c.empId===emp.id);
+                const totalJ=myCgs.reduce((s,c)=>s+jouvresRange(c.debut+'T12:00',c.fin+'T12:00'),0);
+                const cpJ=myCgs.filter(c=>c.type==="Congé").reduce((s,c)=>s+jouvresRange(c.debut+'T12:00',c.fin+'T12:00'),0);
+                const rttJ=myCgs.filter(c=>c.type==="RTT").reduce((s,c)=>s+jouvresRange(c.debut+'T12:00',c.fin+'T12:00'),0);
+                return (
+                  <div key={emp.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',borderRadius:8,marginBottom:6,background:'#f8f9fa',borderLeft:`4px solid ${es.accent}`}}>
+                    <span style={{fontWeight:700,fontSize:12,color:es.accent,minWidth:80}}>{emp.name}</span>
+                    <span style={{fontSize:11,color:'#10b981',fontWeight:700}}>{cpJ}j CP</span>
+                    <span style={{fontSize:11,color:'#6366f1',fontWeight:700}}>{rttJ}j RTT</span>
+                    <span style={{fontSize:11,color:'#555',fontWeight:600,marginLeft:'auto'}}>{totalJ}j total</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -919,6 +1287,7 @@ function App() {
   };
 
   // ── Styles partagés ───────────────────────────────────────────────────────
+  const bSLocal = {padding:'6px 12px',borderRadius:7,border:'1px solid #ddd',background:'#fff',color:'#555',fontWeight:600,cursor:'pointer',fontSize:13};
   const th = {padding:'10px 12px',background:'#fff',color:'#555',fontWeight:700,fontSize:12,textAlign:'center',borderBottom:'2px solid #eee'};
   const td = {padding:'7px 10px',fontSize:12,color:'#444',verticalAlign:'middle'};
   const btnStyle = {padding:'7px 14px',borderRadius:8,border:'1px solid #ddd',background:'#fff',color:'#555',fontWeight:600,cursor:'pointer',fontSize:13};
@@ -943,9 +1312,10 @@ function App() {
             <div style={{fontSize:11,color:'#aaa'}}>35h/semaine · {employees.length} collaborateurs</div>
           </div>
         </div>
-        <div style={{display:'flex',gap:6}}>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
           {navBtn("calendrier","🗓 Calendrier")}
           {navBtn("planning","📅 Planning")}
+          {navBtn("conges","🏖️ Congés")}
           {navBtn("recap","📊 Compte rendu")}
           {isAdmin && navBtn("equipe","👥 Équipe")}
         </div>
@@ -971,6 +1341,7 @@ function App() {
       <div style={{padding:24,maxWidth:1400,margin:'0 auto'}}>
         {view==="calendrier" && renderCalendrier()}
         {view==="planning" && renderPlanning()}
+        {view==="conges"   && renderConges()}
         {view==="recap"    && renderRecap()}
         {view==="equipe"   && renderEquipe()}
       </div>
