@@ -226,34 +226,34 @@ function Login({onLogin}) {
 // ── Composant principal ───────────────────────────────────────────────────────
 function App() {
   const today = new Date();
-  const [session, setSession] = React.useState(null); // {user, role}
+
+  // ⚠️ Tous les hooks DOIVENT être déclarés avant tout return conditionnel
+  const [session, setSession]       = React.useState(null);
   const [sessionLoaded, setSessionLoaded] = React.useState(false);
+  const [employees, setEmployees]   = React.useState(DEFAULT_EMP);
+  const [cells, setCells]           = React.useState({});
+  const [monday, setMonday]         = React.useState(getMondayOf(today));
+  const [view, setView]             = React.useState("calendrier");
+  const [calMonth, setCalMonth]     = React.useState(today.getMonth());
+  const [calYear,  setCalYear]      = React.useState(today.getFullYear());
+  const [modal, setModal]           = React.useState(null);
+  const [mVal, setMVal]             = React.useState("");
+  const [mHS,  setMHS]              = React.useState(0);
+  const [mCustom, setMCustom]       = React.useState("");
+  const [newName, setNewName]       = React.useState("");
+  const [recapMonth, setRecapMonth] = React.useState(today.getMonth());
+  const [recapYear,  setRecapYear]  = React.useState(today.getFullYear());
+
   const isAdmin = session?.role === "admin";
 
+  // Charger session
   React.useEffect(() => {
     const s = loadSession();
     if (s) setSession(s);
     setSessionLoaded(true);
   }, []);
 
-  if (!sessionLoaded) return null;
-  if (!session) return <Login onLogin={s=>setSession(s)} />;
-  const [employees, setEmployees] = React.useState(DEFAULT_EMP);
-  // cells: { [empId]: { [dateKey]: { val: string, hsupp: number } } }
-  const [cells, setCells] = React.useState({});
-  const [monday, setMonday] = React.useState(getMondayOf(today));
-  const [view, setView] = React.useState("calendrier"); // calendrier | planning | recap | equipe
-  const [calMonth, setCalMonth] = React.useState(today.getMonth());
-  const [calYear,  setCalYear]  = React.useState(today.getFullYear());
-  const [modal, setModal] = React.useState(null); // {empId, date, dayIdx}
-  const [mVal, setMVal] = React.useState("");
-  const [mHS,  setMHS]  = React.useState(0);
-  const [mCustom, setMCustom] = React.useState("");
-  const [newName, setNewName] = React.useState("");
-  // Recap: mois selectionné
-  const [recapMonth, setRecapMonth] = React.useState(today.getMonth());
-  const [recapYear,  setRecapYear]  = React.useState(today.getFullYear());
-
+  // Charger données planning
   React.useEffect(() => {
     const d = load();
     if (d) {
@@ -262,11 +262,16 @@ function App() {
     }
   }, []);
 
+  // Sauvegarder données planning
   React.useEffect(() => {
     save({employees, cells});
   }, [employees, cells]);
 
   const weekDays = React.useMemo(() => getWeekDays(monday), [monday]);
+
+  // Returns conditionnels APRÈS tous les hooks
+  if (!sessionLoaded) return null;
+  if (!session) return <Login onLogin={s => setSession(s)} />;
 
   const navWeek = dir => setMonday(prev => addDays(prev, dir*7));
 
