@@ -128,9 +128,116 @@ const getCellTextColor = (val) => {
   return '#333';
 };
 
+// ── Utilisateurs & rôles ──────────────────────────────────────────────────────
+const USERS = [
+  {user:"Laetitia",  pass:"Boutique2014!", role:"admin"},
+  {user:"Nicolas",   pass:"12345",         role:"lecteur"},
+  {user:"Charlotte", pass:"12345",         role:"lecteur"},
+  {user:"Marco",     pass:"12345",         role:"lecteur"},
+  {user:"Alan",      pass:"12345",         role:"lecteur"},
+  {user:"Corentin",  pass:"12345",         role:"lecteur"},
+];
+
+const SESSION_KEY = "planningSession";
+const saveSession = s => { try{localStorage.setItem(SESSION_KEY,JSON.stringify(s));}catch{} };
+const loadSession = () => { try{const v=localStorage.getItem(SESSION_KEY);if(v)return JSON.parse(v);}catch{} return null; };
+const clearSession = () => { try{localStorage.removeItem(SESSION_KEY);}catch{} };
+
+// ── Écran de connexion ────────────────────────────────────────────────────────
+function Login({onLogin}) {
+  const [user, setUser]   = React.useState("");
+  const [pass, setPass]   = React.useState("");
+  const [err,  setErr]    = React.useState("");
+  const [showP, setShowP] = React.useState(false);
+
+  const handleLogin = () => {
+    const found = USERS.find(u => u.user.toLowerCase()===user.trim().toLowerCase() && u.pass===pass.trim());
+    if (found) {
+      const session = {user: found.user, role: found.role};
+      saveSession(session);
+      onLogin(session);
+    } else {
+      setErr("Identifiant ou mot de passe incorrect.");
+      setTimeout(()=>setErr(""), 3000);
+    }
+  };
+
+  return (
+    <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Segoe UI',Arial,sans-serif"}}>
+      <div style={{background:'#fff',borderRadius:20,padding:40,width:380,maxWidth:'calc(100vw - 32px)',boxShadow:'0 30px 80px #0005'}}>
+        {/* Logo */}
+        <div style={{textAlign:'center',marginBottom:32}}>
+          <div style={{width:60,height:60,background:'linear-gradient(135deg,#1a6ed8,#8b1ad6)',borderRadius:16,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,margin:'0 auto 14px'}}>📅</div>
+          <div style={{fontSize:22,fontWeight:800,color:'#1a1a2e',letterSpacing:'-0.5px'}}>Planning Équipe</div>
+          <div style={{fontSize:12,color:'#aaa',marginTop:4}}>Connectez-vous pour accéder au planning</div>
+        </div>
+
+        {/* Champs */}
+        <div style={{marginBottom:14}}>
+          <label style={{display:'block',fontSize:11,color:'#888',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:6}}>Identifiant</label>
+          <input
+            value={user}
+            onChange={e=>setUser(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&handleLogin()}
+            placeholder="Votre prénom"
+            style={{width:'100%',border:'1.5px solid #e5e7eb',borderRadius:10,padding:'11px 14px',fontSize:14,color:'#1a1a2e',background:'#f8f9fa',boxSizing:'border-box'}}
+            autoFocus
+          />
+        </div>
+        <div style={{marginBottom:20}}>
+          <label style={{display:'block',fontSize:11,color:'#888',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:6}}>Mot de passe</label>
+          <div style={{position:'relative'}}>
+            <input
+              type={showP?'text':'password'}
+              value={pass}
+              onChange={e=>setPass(e.target.value)}
+              onKeyDown={e=>e.key==='Enter'&&handleLogin()}
+              placeholder="••••••••"
+              style={{width:'100%',border:'1.5px solid #e5e7eb',borderRadius:10,padding:'11px 40px 11px 14px',fontSize:14,color:'#1a1a2e',background:'#f8f9fa',boxSizing:'border-box'}}
+            />
+            <button onClick={()=>setShowP(p=>!p)} style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:16,color:'#aaa'}}>
+              {showP?'🙈':'👁️'}
+            </button>
+          </div>
+        </div>
+
+        {/* Erreur */}
+        {err && (
+          <div style={{background:'#fce8e8',border:'1px solid #f8d7da',borderRadius:8,padding:'10px 14px',color:'#d63384',fontSize:13,fontWeight:600,marginBottom:16,textAlign:'center'}}>
+            ⚠️ {err}
+          </div>
+        )}
+
+        <button
+          onClick={handleLogin}
+          style={{width:'100%',padding:'13px 0',borderRadius:10,border:'none',background:'linear-gradient(135deg,#1a6ed8,#8b1ad6)',color:'#fff',fontWeight:800,fontSize:15,cursor:'pointer',boxShadow:'0 4px 15px #1a6ed844',letterSpacing:'0.2px'}}
+        >
+          Se connecter →
+        </button>
+
+        <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'#ccc'}}>
+          🔒 Accès sécurisé · Planning Équipe
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Composant principal ───────────────────────────────────────────────────────
 function App() {
   const today = new Date();
+  const [session, setSession] = React.useState(null); // {user, role}
+  const [sessionLoaded, setSessionLoaded] = React.useState(false);
+  const isAdmin = session?.role === "admin";
+
+  React.useEffect(() => {
+    const s = loadSession();
+    if (s) setSession(s);
+    setSessionLoaded(true);
+  }, []);
+
+  if (!sessionLoaded) return null;
+  if (!session) return <Login onLogin={s=>setSession(s)} />;
   const [employees, setEmployees] = React.useState(DEFAULT_EMP);
   // cells: { [empId]: { [dateKey]: { val: string, hsupp: number } } }
   const [cells, setCells] = React.useState({});
@@ -385,7 +492,7 @@ function App() {
                         const h  = parseHeures(c.val);
                         return (
                           <td key={k}
-                            onClick={()=>inMonth&&openModal(emp.id,d,d.getDay()-1)}
+                            onClick={()=>inMonth&&isAdmin&&openModal(emp.id,d,d.getDay()-1)}
                             style={{padding:'4px 3px',borderBottom:'1px solid #f0f0f0',borderLeft:di===0?'2px solid #e5e7eb':'1px solid #f0f0f0',background:isT&&inMonth?bg+'cc':bg,cursor:inMonth?'pointer':'default',verticalAlign:'top',minWidth:62,transition:'filter 0.1s'}}
                             onMouseEnter={e=>inMonth&&(e.currentTarget.style.filter='brightness(0.93)')}
                             onMouseLeave={e=>(e.currentTarget.style.filter='')}
@@ -500,7 +607,7 @@ function App() {
                       const h = parseHeures(c.val);
                       return (
                         <td key={i}
-                          onClick={()=>openModal(emp.id, d, i)}
+                          onClick={()=>isAdmin&&openModal(emp.id, d, i)}
                           style={{padding:'6px 8px', borderBottom:'1px solid #f0f0f0', borderLeft:'1px solid #eee', background:isWE?'#fafafa':cellBg, cursor:'pointer', verticalAlign:'top', minWidth:130, transition:'filter 0.1s'}}
                           title="Cliquer pour saisir"
                           onMouseEnter={e=>e.currentTarget.style.filter='brightness(0.95)'}
@@ -835,9 +942,25 @@ function App() {
           {navBtn("calendrier","🗓 Calendrier")}
           {navBtn("planning","📅 Planning")}
           {navBtn("recap","📊 Compte rendu")}
-          {navBtn("equipe","👥 Équipe")}
+          {isAdmin && navBtn("equipe","👥 Équipe")}
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:13,fontWeight:700,color:'#1a1a2e'}}>👤 {session.user}</div>
+            <div style={{fontSize:10,color:isAdmin?'#8b1ad6':'#1a6ed8',fontWeight:600}}>{isAdmin?'✏️ Administrateur':'👁 Lecteur'}</div>
+          </div>
+          <button onClick={()=>{clearSession();setSession(null);}} style={{padding:'7px 12px',borderRadius:8,border:'1px solid #e5e7eb',background:'#f8f9fa',color:'#888',fontWeight:600,fontSize:12,cursor:'pointer'}}>
+            Déconnexion
+          </button>
         </div>
       </div>
+
+      {/* Bandeau lecteur */}
+      {!isAdmin && (
+        <div style={{background:'#fff8e1',borderBottom:'1px solid #ffe082',padding:'8px 24px',display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#f57c00',fontWeight:600}}>
+          👁 Mode consultation — Vous pouvez voir le planning mais pas le modifier. Seule Laetitia peut effectuer des modifications.
+        </div>
+      )}
 
       {/* Content */}
       <div style={{padding:24,maxWidth:1400,margin:'0 auto'}}>
@@ -847,7 +970,7 @@ function App() {
         {view==="equipe"   && renderEquipe()}
       </div>
 
-      {renderModal()}
+      {isAdmin && renderModal()}
     </div>
   );
 }
