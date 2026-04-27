@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Planning Équipe</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f172a; font-family: 'Segoe UI', sans-serif; color: #e2e8f0; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #1e293b; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  input, select { outline: none; }
+  input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const STORAGE_KEY = "planning_equipe_v2";
+const HEURES_JOUR = 7;
+const HEURES_SEMAINE = 35;
+
+const TYPES = {
+  CP:   { label: "Congé payé",  color: "#10b981", short: "CP"   },
+  RTT:  { label: "RTT",         color: "#6366f1", short: "RTT"  },
+  MAL:  { label: "Maladie",     color: "#ef4444", short: "MAL"  },
+  FORM: { label: "Formation",   color: "#f59e0b", short: "FORM" },
+  ABS:  { label: "Absence",     color: "#94a3b8", short: "ABS"  },
+};
+
+const DEFAULT_EMP = [
+  { id:"e1", name:"Laetitia",  color:"#ec4899" },
+  { id:"e2", name:"Nicolas",   color:"#3b82f6" },
+  { id:"e3", name:"Charlotte", color:"#8b5cf6" },
+  { id:"e4", name:"Marco",     color:"#f59e0b" },
+  { id:"e5", name:"Alan",      color:"#10b981" },
+  { id:"e6", name:"Corentin",  color:"#06b6d4" },
+];
+
+const dk = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const isWE = d => d.getDay()===0||d.getDay()===6;
+const getDays = (y,m) => { const days=[],d=new Date(y,m,1); while(d.getMonth()===m){days.push(new Date(d));d.setDate(d.getDate()+1);} return days; };
+const frMonth = (y,m) => new Date(y,m,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+const frDay = d => d.toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit'});
+
+function loadData() {
+  try { const v=localStorage.getItem(STORAGE_KEY); if(v) return JSON.parse(v); } catch{}
+  return null;
+}
+function saveData(d) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch{}
+}
+
+function App() {
+  const today = new Date();
+  const [year,  setYear]  = React.useState(today.getFullYear());
+  const [month, setMonth] = React.useState(today.getMonth());
+  const [employees, setEmployees] = React.useState(DEFAULT_EMP);
+  const [absences,  setAbsences]  = React.useState({});
+  const [hsupp,     setHsupp]     = React.useState({});
+  const [view, setView] = React.useState("planning");
+  const [modal, setModal] = React.useState(null);
+  const [mType,  setMType]  = React.useState("CP");
+  const [mHours, setMHours] = React.useState(7);
+  const [mHS,    setMHS]    = React.useState(0);
+  const [newName,  setNewName]  = React.useState("");
+  const [newColor, setNewColor] = React.useState("#3b82f6");
+
+  React.useEffect(() => {
+    const d = loadData();
+    if (d) {
+      if (d.employees) setEmployees(d.employees);
+      if (d.absences)  setAbsences(d.absences);
+      if (d.hsupp)     setHsupp(d.hsupp);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    saveData({ employees, absences, hsupp });
+  }, [employees, absences, hsupp]);
+
+  const days     = React.useMemo(() => getDays(year, month), [year, month]);
+  const workDays = React.useMemo(() => days.filter(d => !isWE(d)), [days]);
+
+  const navMonth = dir => {
+    let m = month+dir, y = year;
+    if (m<0){m=11;y--;} if (m>11){m=0;y++;}
+    setMonth(m); setYear(y);
+  };
+
+  const openModal = (empId, date) => {
+    const k = dk(date);
+    const ab = (absences[empId]||{})[k];
+    const hs = (hsupp[empId]||{})[k];
+    setMType(ab?.type||"CP"); setMHours(ab?.hours??7); setMHS(hs||0);
+    setModal({empId, date, k});
+  };
+
+  const saveModal = () => {
+    if (!modal) return;
+    const {empId, k} = modal;
+    setAbsences(prev => {
+      const n = {...prev, [empId]: {...(prev[empId]||{})}};
+      if (mType && Number(mHours)>0) n[empId][k] = {type:mType, hours:Number(mHours)};
+      else delete n[empId][k];
+      return n;
+    });
+    setHsupp(prev => {
+      const n = {...prev, [empId]: {...(prev[empId]||{})}};
+      if (Number(mHS)>0) n[empId][k] = Number(mHS);
+      else delete n[empId][k];
+      return n;
+    });
+    setModal(null);
+  };
+
+  const clearModal = () => {
+    if (!modal) return;
+    const {empId,k} = modal;
+    setAbsences(prev => { const n={...prev,[empId]:{...(prev[empId]||{})}}; delete n[empId][k]; return n; });
+    setHsupp(prev => { const n={...prev,[empId]:{...(prev[empId]||{})}}; delete n[empId][k]; return n; });
+    setModal(null);
+  };
+
+  const getStats = empId => {
+    const ea = absences[empId]||{}, eh = hsupp[empId]||{};
+    let cp=0,rtt=0,mal=0,form=0,abs=0,absH=0,hsTotal=0;
+    workDays.forEach(d => {
+      const k=dk(d), ab=ea[k], hs=eh[k];
+      if (ab) {
+        const h=ab.hours??7;
+        if(ab.type==="CP") cp+=h/7; else if(ab.type==="RTT") rtt+=h/7;
+        else if(ab.type==="MAL") mal+=h/7; else if(ab.type==="FORM") form+=h/7; else abs+=h/7;
+        absH+=h;
+      }
+      if (hs) hsTotal+=Number(hs);
+    });
+    const theorique = workDays.length*7;
+    const travaillees = theorique - absH + hsTotal;
+    return {cp,rtt,mal,form,abs,absH,hsTotal,theorique,travaillees};
+  };
+
+  const getWeeks = empId => {
+    const ea=absences[empId]||{}, eh=hsupp[empId]||{};
+    const weeks={};
+    workDays.forEach(d=>{
+      const jan1=new Date(d.getFullYear(),0,1);
+      const w=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
+      if(!weeks[w]) weeks[w]=[];
+      weeks[w].push(d);
+    });
+    return Object.entries(weeks).map(([wk,wDays])=>{
+      let absH=0,supH=0;
+      wDays.forEach(d=>{
+        const k=dk(d),ab=ea[k],hs=eh[k];
+        if(ab) absH+=ab.hours??7;
+        if(hs) supH+=Number(hs);
+      });
+      const theorique=wDays.length*7, travaillees=theorique-absH+supH, diff=travaillees-HEURES_SEMAINE;
+      return {wk,wDays,theorique,travaillees,diff,absH,supH};
+    });
+  };
+
+  const todayKey = dk(today);
+
+  // ── PLANNING ──
+  const renderPlanning = () => (
+    <div>
+      <div style={{marginBottom:16,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+        {Object.entries(TYPES).map(([k,v])=>(
+          <span key={k} style={{background:v.color+'22',color:v.color,border:`1px solid ${v.color}55`,borderRadius:6,padding:'2px 8px',fontSize:11,fontWeight:700}}>{v.label}</span>
+        ))}
+        <span style={{background:'#f59e0b22',color:'#f59e0b',border:'1px solid #f59e0b55',borderRadius:6,padding:'2px 8px',fontSize:11,fontWeight:700}}>⚡ H.Supp</span>
+        <span style={{fontSize:11,color:'#64748b',marginLeft:4}}>· Cliquez sur une cellule pour saisir · {workDays.length} jours ouvrés</span>
+      </div>
+      <div style={{overflowX:'auto'}}>
+        <table style={{borderCollapse:'collapse',minWidth:900}}>
+          <thead>
+            <tr>
+              <th style={{padding:'10px 14px',background:'#1e293b',color:'#94a3b8',fontWeight:600,fontSize:12,textAlign:'left',borderBottom:'2px solid #334155',position:'sticky',left:0,zIndex:2,minWidth:130}}>Employé</th>
+              {days.map(d=>(
+                <th key={dk(d)} style={{padding:'6px 3px',background:isWE(d)?'#0f1f38':'#1e293b',color:isWE(d)?'#475569':'#94a3b8',fontWeight:600,fontSize:10,textAlign:'center',borderBottom:'2px solid #334155',minWidth:42,borderLeft:'1px solid #0f172a'}}>
+                  <div>{d.toLocaleDateString('fr-FR',{weekday:'short'}).slice(0,3)}</div>
+                  <div style={{fontWeight:800,fontSize:12,color:dk(d)===todayKey?'#3b82f6':undefined}}>{d.getDate()}</div>
+                </th>
+              ))}
+              <th style={{padding:'10px 10px',background:'#1e293b',color:'#94a3b8',fontWeight:600,fontSize:12,textAlign:'center',borderBottom:'2px solid #334155',minWidth:130}}>Récap mois</th>
+            </tr>
+          </thead>
+          <tbody>
+            {employees.map(emp=>{
+              const ea=absences[emp.id]||{}, eh=hsupp[emp.id]||{};
+              const stats=getStats(emp.id);
+              return (
+                <tr key={emp.id}>
+                  <td style={{padding:'8px 14px',background:'#1e293b',borderBottom:'1px solid #0f172a',fontWeight:700,fontSize:13,color:'#f1f5f9',whiteSpace:'nowrap',position:'sticky',left:0,zIndex:1,borderLeft:`4px solid ${emp.color}`}}>{emp.name}</td>
+                  {days.map(d=>{
+                    const k=dk(d),ab=ea[k],hs=eh[k],we=isWE(d),isT=k===todayKey;
+                    return (
+                      <td key={k}
+                        onClick={()=>!we&&openModal(emp.id,d)}
+                        style={{padding:2,textAlign:'center',borderBottom:'1px solid #0f172a',borderLeft:'1px solid #1e293b',background:we?'#0a1628':isT?'#172554':ab?TYPES[ab.type]?.color+'18':'#151f35',cursor:we?'default':'pointer',minWidth:42}}
+                        title={we?'':(ab?TYPES[ab.type]?.label+(hs?` +${hs}h supp`:''):hs?`+${hs}h supp`:'Cliquer pour saisir')}
+                      >
+                        {!we&&<div style={{width:36,height:36,margin:'0 auto',borderRadius:6,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,gap:1,background:ab?TYPES[ab.type]?.color+'30':'transparent',border:ab?`1.5px solid ${TYPES[ab.type]?.color}`:hs?'1.5px solid #f59e0b':'1.5px solid transparent',color:ab?TYPES[ab.type]?.color:hs?'#f59e0b':'#475569'}}>
+                          {ab&&<span>{TYPES[ab.type]?.short}</span>}
+                          {hs&&!ab&&<span>+{hs}h</span>}
+                          {ab&&hs&&<span style={{color:'#f59e0b',fontSize:8}}>+{hs}h</span>}
+                        </div>}
+                      </td>
+                    );
+                  })}
+                  <td style={{padding:'4px 8px',textAlign:'center',verticalAlign:'middle',background:'#151f35',borderBottom:'1px solid #0f172a'}}>
+                    <div style={{display:'flex',flexDirection:'column',gap:3}}>
+                      {stats.cp>0&&<span style={{background:'#10b98122',color:'#10b981',border:'1px solid #10b98155',borderRadius:5,padding:'1px 6px',fontSize:10,fontWeight:700}}>{stats.cp}j CP</span>}
+                      {stats.rtt>0&&<span style={{background:'#6366f122',color:'#6366f1',border:'1px solid #6366f155',borderRadius:5,padding:'1px 6px',fontSize:10,fontWeight:700}}>{stats.rtt}j RTT</span>}
+                      {stats.mal>0&&<span style={{background:'#ef444422',color:'#ef4444',border:'1px solid #ef444455',borderRadius:5,padding:'1px 6px',fontSize:10,fontWeight:700}}>{stats.mal}j Mal.</span>}
+                      {stats.hsTotal>0&&<span style={{background:'#f59e0b22',color:'#f59e0b',border:'1px solid #f59e0b55',borderRadius:5,padding:'1px 6px',fontSize:10,fontWeight:700}}>+{stats.hsTotal}h</span>}
+                      {stats.cp===0&&stats.rtt===0&&stats.mal===0&&stats.hsTotal===0&&<span style={{color:'#334155',fontSize:10}}>—</span>}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  // ── RECAP ──
+  const renderRecap = () => (
+    <div>
+      <div style={{fontSize:20,fontWeight:800,color:'#f1f5f9',marginBottom:20,letterSpacing:'-0.5px'}}>
+        Compte rendu — <span style={{color:'#3b82f6',textTransform:'capitalize'}}>{frMonth(year,month)}</span>
+      </div>
+      {employees.map(emp=>{
+        const s=getStats(emp.id), ws=getWeeks(emp.id);
+        return (
+          <div key={emp.id} style={{background:'#1e293b',borderRadius:12,padding:20,marginBottom:16,border:'1px solid #334155',borderLeft:`4px solid ${emp.color}`}}>
+            <div style={{fontSize:15,fontWeight:700,color:'#f1f5f9',marginBottom:14,display:'flex',alignItems:'center',gap:8}}>
+              <span style={{width:10,height:10,borderRadius:'50%',background:emp.color,display:'inline-block'}}/>
+              {emp.name}
+              <span style={{fontSize:11,color:'#64748b',fontWeight:400}}>· {workDays.length} jours ouvrés · {s.theorique}h théoriques</span>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:16}}>
+              {[
+                {label:'CP posés',    val:s.cp,       unit:'j',  color:'#10b981'},
+                {label:'RTT',         val:s.rtt,      unit:'j',  color:'#6366f1'},
+                {label:'Maladie',     val:s.mal,      unit:'j',  color:'#ef4444'},
+                {label:'Formation',   val:s.form,     unit:'j',  color:'#f59e0b'},
+                {label:'H. Supp.',    val:s.hsTotal,  unit:'h',  color:'#f59e0b'},
+                {label:'H. travaillées', val:s.travaillees, unit:'h', color:s.travaillees>=s.theorique?'#10b981':'#ef4444'},
+              ].map(({label,val,unit,color})=>(
+                <div key={label} style={{background:color+'11',border:`1px solid ${color}33`,borderRadius:8,padding:'10px 12px'}}>
+                  <div style={{fontSize:10,color:'#64748b',fontWeight:600,marginBottom:3,textTransform:'uppercase',letterSpacing:'0.5px'}}>{label}</div>
+                  <div style={{fontSize:20,fontWeight:800,color}}>{val}<span style={{fontSize:10,color:'#94a3b8',marginLeft:2}}>{unit}</span></div>
+                </div>
+              ))}
+            </div>
+            <div style={{fontSize:11,color:'#64748b',fontWeight:600,marginBottom:8,textTransform:'uppercase',letterSpacing:'0.5px'}}>Détail par semaine</div>
+            <table style={{width:'100%',borderCollapse:'collapse'}}>
+              <thead>
+                <tr>{['Semaine','J. ouvrés','H. théo.','H. abs.','H. supp.','H. trav.','Écart 35h'].map(h=>(
+                  <th key={h} style={{padding:'6px 8px',background:'#0f172a',color:'#64748b',fontSize:11,fontWeight:600,textAlign:'left',borderBottom:'1px solid #334155'}}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {ws.map(w=>(
+                  <tr key={w.wk}>
+                    <td style={{padding:'6px 8px',borderBottom:'1px solid #1e293b',fontSize:12,color:'#e2e8f0'}}>Sem. {w.wk}</td>
+                    <td style={{padding:'6px 8px',borderBottom:'1px solid #1e293b',fontSize:12,color:'#e2e8f0'}}>{w.wDays.length}j</td>
+                    <td style={{padding:'6px 8px',borderBottom:'1px solid #1e293b',fontSize:12,color:'#e2e8f0'}}>{w.theorique}h</td>
+                    <td style={{padding:'6px 8px',borderBottom:'1px solid #1e293b',fontSize:12,color:w.absH>0?'#ef4444':'#64748b'}}>{w.absH>0?`-${w.absH}h`:'—'}</td>
+                    <td style={{padding:'6px 8px',borderBottom:'1px solid #1e293b',fontSize:12,color:w.supH>0?'#f59e0b':'#64748b'}}>{w.supH>0?`+${w.supH}h`:'—'}</td>
+                    <td style={{padding:'6px 8px',borderBottom:'1px solid #1e293b',fontSize:12,color:'#e2e8f0',fontWeight:600}}>{w.travaillees}h</td>
+                    <td style={{padding:'6px 8px',borderBottom:'1px solid #1e293b',fontSize:12}}>
+                      <span style={{background:w.diff>0?'#f59e0b22':w.diff<0?'#ef444422':'#10b98122',color:w.diff>0?'#f59e0b':w.diff<0?'#ef4444':'#10b981',borderRadius:20,padding:'2px 8px',fontSize:11,fontWeight:700}}>
+                        {w.diff>0?`+${w.diff}h`:w.diff<0?`${w.diff}h`:'✓'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+      <div style={{background:'#172554',borderRadius:12,padding:20,border:'1px solid #1e40af'}}>
+        <div style={{fontSize:15,fontWeight:700,color:'#f1f5f9',marginBottom:14}}>📊 Synthèse équipe</div>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead>
+            <tr>{['Employé','CP','RTT','Maladie','Formation','H.Supp','H.travaillées'].map(h=>(
+              <th key={h} style={{padding:'6px 8px',background:'#0f172a',color:'#64748b',fontSize:11,fontWeight:600,textAlign:'left',borderBottom:'1px solid #334155'}}>{h}</th>
+            ))}</tr>
+          </thead>
+          <tbody>
+            {employees.map(emp=>{
+              const s=getStats(emp.id);
+              return (
+                <tr key={emp.id}>
+                  <td style={{padding:'7px 8px',borderBottom:'1px solid #1e293b',fontWeight:700,color:'#f1f5f9',fontSize:13}}>
+                    <span style={{color:emp.color}}>●</span> {emp.name}
+                  </td>
+                  {[
+                    {v:s.cp,   u:'j', c:'#10b981'},
+                    {v:s.rtt,  u:'j', c:'#6366f1'},
+                    {v:s.mal,  u:'j', c:'#ef4444'},
+                    {v:s.form, u:'j', c:'#f59e0b'},
+                    {v:s.hsTotal, u:'h', c:'#f59e0b'},
+                  ].map(({v,u,c},i)=>(
+                    <td key={i} style={{padding:'7px 8px',borderBottom:'1px solid #1e293b',color:v>0?c:'#334155',fontWeight:v>0?700:400,fontSize:12}}>
+                      {v>0?`${v}${u}`:'—'}
+                    </td>
+                  ))}
+                  <td style={{padding:'7px 8px',borderBottom:'1px solid #1e293b',fontWeight:700,fontSize:12,color:s.travaillees>=s.theorique?'#10b981':'#f87171'}}>
+                    {s.travaillees}h / {s.theorique}h
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  // ── EQUIPE ──
+  const renderEquipe = () => (
+    <div style={{maxWidth:520}}>
+      <div style={{fontSize:20,fontWeight:800,color:'#f1f5f9',marginBottom:20}}>Gestion de l'équipe</div>
+      {employees.map(emp=>(
+        <div key={emp.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',background:'#1e293b',borderRadius:10,marginBottom:8,border:'1px solid #334155'}}>
+          <div style={{width:14,height:14,borderRadius:'50%',background:emp.color,flexShrink:0}}/>
+          <span style={{flex:1,fontWeight:600,color:'#f1f5f9'}}>{emp.name}</span>
+          <button onClick={()=>setEmployees(p=>p.filter(e=>e.id!==emp.id))} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',fontSize:16,lineHeight:1}}>✕</button>
+        </div>
+      ))}
+      <div style={{background:'#1e293b',borderRadius:12,padding:20,marginTop:20,border:'1px solid #334155'}}>
+        <div style={{fontSize:13,fontWeight:700,color:'#f1f5f9',marginBottom:14}}>Ajouter un employé</div>
+        <div style={{fontSize:11,color:'#94a3b8',fontWeight:600,marginBottom:6,textTransform:'uppercase',letterSpacing:'0.5px'}}>Nom</div>
+        <input value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addEmp()} placeholder="Prénom Nom"
+          style={{width:'100%',background:'#0f172a',border:'1px solid #334155',color:'#f1f5f9',borderRadius:8,padding:'8px 10px',fontSize:13,marginBottom:14}}/>
+        <div style={{fontSize:11,color:'#94a3b8',fontWeight:600,marginBottom:8,textTransform:'uppercase',letterSpacing:'0.5px'}}>Couleur</div>
+        <div style={{display:'flex',gap:8,marginBottom:16}}>
+          {["#3b82f6","#8b5cf6","#ec4899","#10b981","#f59e0b","#ef4444","#06b6d4","#84cc16"].map(c=>(
+            <div key={c} onClick={()=>setNewColor(c)} style={{width:22,height:22,borderRadius:'50%',background:c,cursor:'pointer',outline:newColor===c?`3px solid ${c}`:'none',outlineOffset:2}}/>
+          ))}
+        </div>
+        <button onClick={addEmp} style={{width:'100%',padding:'10px 0',borderRadius:8,border:'none',background:'linear-gradient(135deg,#3b82f6,#6366f1)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer'}}>
+          + Ajouter
+        </button>
+      </div>
+    </div>
+  );
+
+  const addEmp = () => {
+    if (!newName.trim()) return;
+    setEmployees(p=>[...p,{id:'e'+Date.now(),name:newName.trim(),color:newColor}]);
+    setNewName('');
+  };
+
+  // ── MODAL ──
+  const renderModal = () => {
+    if (!modal) return null;
+    const emp = employees.find(e=>e.id===modal.empId);
+    return (
+      <div onClick={e=>e.target===e.currentTarget&&setModal(null)}
+        style={{position:'fixed',inset:0,background:'#00000088',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,backdropFilter:'blur(4px)'}}>
+        <div style={{background:'#1e293b',borderRadius:16,padding:28,width:380,maxWidth:'calc(100vw - 32px)',border:'1px solid #334155',boxShadow:'0 25px 60px #00000088'}}>
+          <div style={{fontSize:16,fontWeight:700,color:'#f1f5f9',marginBottom:20}}>
+            <span style={{color:emp?.color}}>●</span> {emp?.name} · {frDay(modal.date)}
+          </div>
+          <div style={{fontSize:11,color:'#94a3b8',fontWeight:600,marginBottom:6,textTransform:'uppercase',letterSpacing:'0.5px'}}>Type d'absence</div>
+          <select value={mType} onChange={e=>setMType(e.target.value)}
+            style={{width:'100%',background:'#0f172a',border:'1px solid #334155',color:'#f1f5f9',borderRadius:8,padding:'8px 10px',fontSize:13,marginBottom:14}}>
+            <option value="">— Aucune absence —</option>
+            {Object.entries(TYPES).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+          </select>
+          {mType&&<>
+            <div style={{fontSize:11,color:'#94a3b8',fontWeight:600,marginBottom:6,textTransform:'uppercase',letterSpacing:'0.5px'}}>Durée (heures)</div>
+            <input type="number" min={0.5} max={7} step={0.5} value={mHours} onChange={e=>setMHours(e.target.value)}
+              style={{width:'100%',background:'#0f172a',border:'1px solid #334155',color:'#f1f5f9',borderRadius:8,padding:'8px 10px',fontSize:13,marginBottom:14}}/>
+          </>}
+          <div style={{fontSize:11,color:'#94a3b8',fontWeight:600,marginBottom:6,textTransform:'uppercase',letterSpacing:'0.5px'}}>Heures supplémentaires</div>
+          <input type="number" min={0} max={24} step={0.5} value={mHS} onChange={e=>setMHS(e.target.value)} placeholder="0"
+            style={{width:'100%',background:'#0f172a',border:'1px solid #334155',color:'#f1f5f9',borderRadius:8,padding:'8px 10px',fontSize:13,marginBottom:20}}/>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={saveModal}  style={{flex:1,padding:'10px 0',borderRadius:8,border:'none',background:'linear-gradient(135deg,#3b82f6,#6366f1)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer'}}>✓ Enregistrer</button>
+            <button onClick={clearModal} style={{padding:'10px 14px',borderRadius:8,border:'1px solid #ef444444',background:'#ef444422',color:'#ef4444',fontWeight:700,fontSize:13,cursor:'pointer'}}>✕ Effacer</button>
+            <button onClick={()=>setModal(null)} style={{padding:'10px 14px',borderRadius:8,border:'1px solid #334155',background:'transparent',color:'#94a3b8',fontWeight:600,fontSize:13,cursor:'pointer'}}>Annuler</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const navBtn = (v,label) => (
+    <button onClick={()=>setView(v)} style={{padding:'7px 18px',borderRadius:8,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,background:view===v?'linear-gradient(135deg,#3b82f6,#6366f1)':'#1e293b',color:view===v?'#fff':'#94a3b8'}}>
+      {label}
+    </button>
+  );
+
+  return (
+    <div style={{minHeight:'100vh',background:'#0f172a',color:'#e2e8f0',fontFamily:"'Segoe UI',sans-serif",fontSize:14}}>
+      {/* Header */}
+      <div style={{background:'linear-gradient(135deg,#1e293b,#0f172a)',borderBottom:'1px solid #1e3a5f',padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:36,height:36,background:'linear-gradient(135deg,#3b82f6,#6366f1)',borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>📅</div>
+          <div>
+            <div style={{fontSize:17,fontWeight:700,color:'#f1f5f9',letterSpacing:'-0.5px'}}>PlanningTeam</div>
+            <div style={{fontSize:11,color:'#64748b'}}>Gestion des plannings · 35h/semaine</div>
+          </div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <button onClick={()=>navMonth(-1)} style={{background:'#1e293b',border:'1px solid #334155',color:'#94a3b8',borderRadius:8,padding:'6px 12px',cursor:'pointer',fontSize:16}}>‹</button>
+          <div style={{fontSize:14,fontWeight:700,color:'#f1f5f9',minWidth:160,textAlign:'center',textTransform:'capitalize'}}>{frMonth(year,month)}</div>
+          <button onClick={()=>navMonth(1)}  style={{background:'#1e293b',border:'1px solid #334155',color:'#94a3b8',borderRadius:8,padding:'6px 12px',cursor:'pointer',fontSize:16}}>›</button>
+        </div>
+        <div style={{display:'flex',gap:4}}>
+          {navBtn("planning","📅 Planning")}
+          {navBtn("recap","📊 Compte rendu")}
+          {navBtn("equipe","👥 Équipe")}
+        </div>
+      </div>
+      {/* Content */}
+      <div style={{padding:20,overflowX:'auto'}}>
+        {view==="planning" && renderPlanning()}
+        {view==="recap"    && renderRecap()}
+        {view==="equipe"   && renderEquipe()}
+      </div>
+      {renderModal()}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
