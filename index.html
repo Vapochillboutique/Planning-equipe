@@ -36,6 +36,13 @@ input,select,button,textarea{font-family:inherit;font-size:14px;outline:none;}
 ::-webkit-scrollbar{width:6px;height:6px;}
 ::-webkit-scrollbar-track{background:#f1f1f1;}
 ::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px;}
+@media(max-width:640px){
+  .desktop-only{display:none!important;}
+  body{font-size:13px;}
+}
+@media(min-width:641px){
+  .mobile-only{display:none!important;}
+}
 </style>
 </head>
 <body>
@@ -193,6 +200,12 @@ function Login({onLogin}) {
 // ── App principale ────────────────────────────────────────────────────────────
 function App() {
   const today = new Date();
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 640);
+  React.useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth <= 640);
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, []);
 
   // Auth
   const [session,    setSession]    = React.useState(null);
@@ -409,6 +422,89 @@ function App() {
     const weeks=[]; let mon=getMondayOf(firstDay);
     while(mon<=lastDay){weeks.push(getWeekDays(mon));mon=addDays(mon,7);}
     const navCal = dir=>{let m=calMonth+dir,y=calYear;if(m<0){m=11;y--;}if(m>11){m=0;y++;}setCalMonth(m);setCalYear(y);};
+
+    // ── VUE MOBILE : jours en lignes, prénoms en colonnes ──
+    if(isMobile) {
+      const JOURS_SHORT2 = ["L","M","M","J","V"];
+      return (
+        <div>
+          {/* Header mobile */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,padding:'0 2px'}}>
+            <button onClick={()=>navCal(-1)} style={{...btnS,padding:'6px 14px',fontSize:16}}>‹</button>
+            <span style={{fontSize:15,fontWeight:800,color:'#1a1a2e',textTransform:'capitalize'}}>{frMonthLabel(calYear,calMonth)}</span>
+            <button onClick={()=>navCal(1)} style={{...btnS,padding:'6px 14px',fontSize:16}}>›</button>
+          </div>
+
+          {/* Tableau mobile : prénoms en haut, jours à gauche */}
+          <div style={{background:'#fff',borderRadius:12,overflow:'hidden',boxShadow:'0 2px 8px #0001',border:'1px solid #e5e7eb'}}>
+            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+              <table style={{borderCollapse:'collapse',width:'100%',minWidth:0}}>
+                <thead>
+                  <tr style={{background:'#f8f9fa'}}>
+                    <th style={{padding:'8px 6px',fontSize:10,color:'#aaa',fontWeight:700,textAlign:'center',borderBottom:'2px solid #eee',width:42,position:'sticky',left:0,background:'#f8f9fa',zIndex:3}}>Jour</th>
+                    {employees.map((emp,ei)=>{
+                      const es=empStyle(ei);
+                      return <th key={emp.id} style={{padding:'8px 4px',fontSize:11,color:es.accent,fontWeight:800,textAlign:'center',borderBottom:'2px solid #eee',borderLeft:'1px solid #f0f0f0',minWidth:72}}>
+                        {emp.name.slice(0,7)}
+                      </th>;
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {workDays.map((d,di)=>{
+                    const k=dk(d), isT=k===dk(today);
+                    const jourLabel = d.toLocaleDateString('fr-FR',{weekday:'short'}).slice(0,3);
+                    return (
+                      <tr key={k} style={{background:isT?'#eff6ff':di%2===0?'#fff':'#fafafa'}}>
+                        <td style={{padding:'5px 4px',fontSize:10,fontWeight:700,color:isT?'#1a6ed8':'#666',textAlign:'center',borderBottom:'1px solid #f0f0f0',position:'sticky',left:0,background:isT?'#eff6ff':di%2===0?'#fff':'#fafafa',zIndex:2,borderRight:'2px solid #eee',whiteSpace:'nowrap'}}>
+                          <div style={{fontWeight:800}}>{jourLabel}</div>
+                          <div style={{fontSize:12,color:isT?'#1a6ed8':'#333',fontWeight:isT?800:600}}>{d.getDate()}</div>
+                        </td>
+                        {employees.map((emp,ei)=>{
+                          const es=empStyle(ei), cv=getCellVal(emp.id,k);
+                          const bg=getCellBg(cv?.val,es), tc=getCellTxt(cv?.val);
+                          return <td key={emp.id}
+                            onClick={()=>isAdmin&&!cv?.fromCg&&openModal(emp.id,d,d.getDay()-1)}
+                            style={{padding:'4px 3px',borderBottom:'1px solid #f0f0f0',borderLeft:'1px solid #f0f0f0',background:cv?.val?bg:'transparent',cursor:isAdmin&&!cv?.fromCg?'pointer':'default',textAlign:'center',verticalAlign:'middle',minWidth:72}}
+                          >
+                            {cv?.val ? (
+                              <div style={{fontSize:9,fontWeight:700,color:tc,lineHeight:1.3,padding:'2px 3px',borderRadius:5,background:bg}}>
+                                {cv.val.length>10?cv.val.slice(0,10)+'…':cv.val}
+                                {cv.hsupp>0&&<div style={{fontSize:8,color:'#f57c00'}}>⚡+{cv.hsupp}h</div>}
+                              </div>
+                            ) : (
+                              <div style={{color:'#e0e0e0',fontSize:14}}>{isAdmin?'+':''}</div>
+                            )}
+                          </td>;
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mini stats mobile */}
+          <div style={{marginTop:12,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+            {employees.map((emp,ei)=>{
+              const es=empStyle(ei), s=getMonthStats(emp.id,calYear,calMonth);
+              return <div key={emp.id} style={{background:'#fff',borderRadius:10,padding:'10px 12px',border:`2px solid ${es.accent}33`,borderLeft:`4px solid ${es.accent}`}}>
+                <div style={{fontWeight:800,fontSize:13,color:es.accent,marginBottom:4}}>{emp.name}</div>
+                <div style={{fontSize:12,fontWeight:700,color:s.ecart>=0?'#1ab86b':'#d63384'}}>{s.hTotales}h <span style={{color:'#aaa',fontWeight:400,fontSize:10}}>/ {s.hTheo}h</span></div>
+                <div style={{display:'flex',gap:4,marginTop:4,flexWrap:'wrap'}}>
+                  {s.cpJ>0&&<span style={{background:'#d4edda',color:'#155724',borderRadius:4,padding:'1px 5px',fontSize:9,fontWeight:700}}>{s.cpJ}j CP</span>}
+                  {s.rttJ>0&&<span style={{background:'#cce5ff',color:'#004085',borderRadius:4,padding:'1px 5px',fontSize:9,fontWeight:700}}>{s.rttJ}j RTT</span>}
+                  {s.hSupp>0&&<span style={{background:'#fff8e1',color:'#f57c00',borderRadius:4,padding:'1px 5px',fontSize:9,fontWeight:700}}>+{s.hSupp}h⚡</span>}
+                </div>
+              </div>;
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // ── VUE DESKTOP (inchangée) ──
     return (
       <div>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:12}}>
@@ -493,6 +589,83 @@ function App() {
   // ── PLANNING SEMAINE ────────────────────────────────────────────────────────
   const renderPlanning = () => {
     const weekDays=getWeekDays(monday);
+
+    // ── VUE MOBILE ──
+    if(isMobile) {
+      const ouvrés = weekDays.filter(d=>!isWE(d));
+      return (
+        <div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+            <button onClick={()=>setMonday(p=>addDays(p,-7))} style={{...btnS,padding:'6px 14px',fontSize:16}}>‹</button>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:13,fontWeight:800,color:'#1a1a2e'}}>Sem. {frDate(monday)}</div>
+              <div style={{fontSize:11,color:'#aaa'}}>au {frDate(addDays(monday,4))}</div>
+            </div>
+            <button onClick={()=>setMonday(p=>addDays(p,7))} style={{...btnS,padding:'6px 14px',fontSize:16}}>›</button>
+          </div>
+          <div style={{background:'#fff',borderRadius:12,overflow:'hidden',boxShadow:'0 2px 8px #0001',border:'1px solid #e5e7eb'}}>
+            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+              <table style={{borderCollapse:'collapse',width:'100%'}}>
+                <thead>
+                  <tr style={{background:'#f8f9fa'}}>
+                    <th style={{padding:'8px 6px',fontSize:10,color:'#aaa',fontWeight:700,textAlign:'center',borderBottom:'2px solid #eee',width:42,position:'sticky',left:0,background:'#f8f9fa',zIndex:3}}>Jour</th>
+                    {employees.map((emp,ei)=>{
+                      const es=empStyle(ei);
+                      return <th key={emp.id} style={{padding:'8px 4px',fontSize:11,color:es.accent,fontWeight:800,textAlign:'center',borderBottom:'2px solid #eee',borderLeft:'1px solid #f0f0f0',minWidth:80}}>
+                        {emp.name.slice(0,7)}
+                      </th>;
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {ouvrés.map((d,di)=>{
+                    const k=dk(d), isT=k===dk(today);
+                    return (
+                      <tr key={k} style={{background:isT?'#eff6ff':di%2===0?'#fff':'#fafafa'}}>
+                        <td style={{padding:'6px 4px',fontSize:10,fontWeight:700,color:isT?'#1a6ed8':'#555',textAlign:'center',borderBottom:'1px solid #f0f0f0',position:'sticky',left:0,background:isT?'#eff6ff':di%2===0?'#fff':'#fafafa',zIndex:2,borderRight:'2px solid #eee',whiteSpace:'nowrap'}}>
+                          <div>{d.toLocaleDateString('fr-FR',{weekday:'short'}).slice(0,3)}</div>
+                          <div style={{fontSize:13,fontWeight:isT?800:600,color:isT?'#1a6ed8':'#333'}}>{d.getDate()}</div>
+                        </td>
+                        {employees.map((emp,ei)=>{
+                          const es=empStyle(ei), cv=getCellVal(emp.id,k);
+                          const bg=getCellBg(cv?.val,es), tc=getCellTxt(cv?.val);
+                          return <td key={emp.id}
+                            onClick={()=>isAdmin&&!cv?.fromCg&&openModal(emp.id,d,d.getDay()-1)}
+                            style={{padding:'4px 3px',borderBottom:'1px solid #f0f0f0',borderLeft:'1px solid #f0f0f0',background:cv?.val?bg:'transparent',cursor:isAdmin&&!cv?.fromCg?'pointer':'default',textAlign:'center',verticalAlign:'middle',minWidth:80}}
+                          >
+                            {cv?.val ? (
+                              <div style={{fontSize:9,fontWeight:700,color:tc,lineHeight:1.4,padding:'3px 4px',borderRadius:5,background:bg}}>
+                                {cv.val}
+                                {cv.hsupp>0&&<div style={{fontSize:8,color:'#f57c00'}}>⚡+{cv.hsupp}h</div>}
+                                {cv.fromCg&&<div style={{fontSize:8,color:'#888',fontStyle:'italic'}}>📅 congé</div>}
+                              </div>
+                            ) : (
+                              <div style={{color:'#e0e0e0',fontSize:16}}>{isAdmin?'+':''}</div>
+                            )}
+                          </td>;
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr style={{background:'#f8f9fa'}}>
+                    <td style={{padding:'6px 4px',fontSize:10,fontWeight:700,color:'#888',textAlign:'center',borderTop:'2px solid #eee',position:'sticky',left:0,background:'#f8f9fa',zIndex:2}}>Total</td>
+                    {employees.map((emp,ei)=>{
+                      const es=empStyle(ei), ws=getWeekStats(emp.id,ouvrés);
+                      return <td key={emp.id} style={{padding:'6px 4px',textAlign:'center',borderTop:'2px solid #eee',borderLeft:'1px solid #f0f0f0'}}>
+                        <div style={{fontWeight:800,fontSize:13,color:ws.total+ws.hsupp>=H_SEM?'#1ab86b':'#d63384'}}>{ws.total+ws.hsupp}h</div>
+                        {ws.diff!==0&&<div style={{fontSize:9,fontWeight:700,color:ws.diff>0?'#f57c00':'#d63384'}}>{ws.diff>0?`+${ws.diff}h`:`${ws.diff}h`}</div>}
+                      </td>;
+                    })}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div>
         <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:16,flexWrap:'wrap'}}>
@@ -881,33 +1054,33 @@ function App() {
 
   return (
     <div style={{minHeight:'100vh',background:'#f0f2f5',fontFamily:"'Segoe UI',Arial,sans-serif"}}>
-      <div style={{background:'#fff',borderBottom:'1px solid #e5e7eb',padding:'12px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10,boxShadow:'0 1px 4px #0001'}}>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <div style={{width:36,height:36,background:'linear-gradient(135deg,#1a6ed8,#8b1ad6)',borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>📅</div>
-          <div>
+      <div style={{background:'#fff',borderBottom:'1px solid #e5e7eb',padding:isMobile?'10px 12px':'12px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,boxShadow:'0 1px 4px #0001'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <div style={{width:32,height:32,background:'linear-gradient(135deg,#1a6ed8,#8b1ad6)',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>📅</div>
+          {!isMobile&&<div>
             <div style={{fontSize:16,fontWeight:800,color:'#1a1a2e'}}>Planning Équipe</div>
             <div style={{fontSize:10,color:syncStatus.includes('✅')?'#1ab86b':syncStatus.includes('❌')?'#ef4444':'#f57c00',fontWeight:600}}>{syncStatus}</div>
-          </div>
+          </div>}
         </div>
-        <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-          {navBtn("calendrier","🗓 Calendrier")}
-          {navBtn("planning","📅 Planning")}
-          {navBtn("conges","🏖️ Congés")}
-          {navBtn("recap","📊 Compte rendu")}
-          {isAdmin&&navBtn("equipe","👥 Équipe")}
+        <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
+          {navBtn("calendrier",isMobile?"🗓":"🗓 Calendrier")}
+          {navBtn("planning",isMobile?"📅":"📅 Planning")}
+          {navBtn("conges",isMobile?"🏖️":"🏖️ Congés")}
+          {navBtn("recap",isMobile?"📊":"📊 Compte rendu")}
+          {isAdmin&&navBtn("equipe",isMobile?"👥":"👥 Équipe")}
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <div style={{textAlign:'right'}}>
+        <div style={{display:'flex',alignItems:'center',gap:6}}>
+          {!isMobile&&<div style={{textAlign:'right'}}>
             <div style={{fontSize:13,fontWeight:700}}>👤 {session.user}</div>
             <div style={{fontSize:10,color:isAdmin?'#8b1ad6':'#1a6ed8',fontWeight:600}}>{isAdmin?'✏️ Admin':'👁 Lecteur'}</div>
-          </div>
-          <button onClick={()=>{clearSession();setSession(null);}} style={{padding:'6px 12px',borderRadius:8,border:'1px solid #e5e7eb',background:'#f8f9fa',color:'#888',fontWeight:600,fontSize:12,cursor:'pointer'}}>Déconnexion</button>
+          </div>}
+          <button onClick={()=>{clearSession();setSession(null);}} style={{padding:'6px 10px',borderRadius:8,border:'1px solid #e5e7eb',background:'#f8f9fa',color:'#888',fontWeight:600,fontSize:11,cursor:'pointer'}}>{isMobile?'↩':'Déconnexion'}</button>
         </div>
       </div>
       {!isAdmin&&<div style={{background:'#fff8e1',borderBottom:'1px solid #ffe082',padding:'7px 20px',fontSize:12,color:'#f57c00',fontWeight:600}}>
         👁 Mode consultation — Seule Laetitia peut modifier le planning.
       </div>}
-      <div style={{padding:20,maxWidth:1400,margin:'0 auto'}}>
+      <div style={{padding:isMobile?12:20,maxWidth:1400,margin:'0 auto'}}>
         {view==="calendrier"&&renderCalendrier()}
         {view==="planning"&&renderPlanning()}
         {view==="conges"&&renderConges()}
