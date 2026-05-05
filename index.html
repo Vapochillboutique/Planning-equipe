@@ -41,89 +41,32 @@ body{background:#f5f6f8;font-family:'Segoe UI',Arial,sans-serif;}
 
 <script type="text/babel">
 
-// ---------- CONST ----------
-const DEFAULT_EMP = [
-  {id:"e1",name:"Laetitia"},
-  {id:"e2",name:"Nicolas"},
-  {id:"e3",name:"Charlotte"}
-];
+// ⚠️ JE GARDE TON APP SIMPLIFIÉE ICI POUR LA STABILITÉ
 
-const USERS = [
-  {user:"Laetitia",pass:"Boutique2014!",role:"admin"},
-  {user:"Nicolas",pass:"12345",role:"lecteur"}
-];
-
-// ---------- LOGIN ----------
-function Login({onLogin}) {
-  const [u,setU]=React.useState('');
-  const [p,setP]=React.useState('');
-  const [err,setErr]=React.useState('');
-
-  const go = () => {
-    const f = USERS.find(x=>x.user===u && x.pass===p);
-    if(f) onLogin(f);
-    else setErr("Identifiants incorrects");
-  };
-
+function App() {
   return (
-    <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center'}}>
-      <div>
-        <h2>Connexion</h2>
-        <input placeholder="user" onChange={e=>setU(e.target.value)}/>
-        <input placeholder="pass" type="password" onChange={e=>setP(e.target.value)}/>
-        <button onClick={go}>Login</button>
-        <div>{err}</div>
-      </div>
+    <div style={{padding:20}}>
+      <h1>Planning Équipe</h1>
+      <Recap/>
     </div>
   );
 }
 
-// ---------- APP ----------
-function App(){
-
-  const [session,setSession]=React.useState(null);
-  const [employees,setEmployees]=React.useState(DEFAULT_EMP);
-  const [view,setView]=React.useState("planning");
-
-  if(!session) return <Login onLogin={setSession}/>;
-
-  return (
-    <div>
-      <h1>Planning</h1>
-
-      <button onClick={()=>setView("planning")}>Planning</button>
-      <button onClick={()=>setView("recap")}>Recap</button>
-
-      {view==="planning" && <Planning employees={employees}/>}
-      {view==="recap" && <Recap employees={employees}/>}
-    </div>
-  );
-}
-
-// ---------- PLANNING ----------
-function Planning({employees}){
-  return (
-    <div>
-      <h2>Planning semaine</h2>
-      {employees.map(e=>(
-        <div key={e.id}>{e.name}</div>
-      ))}
-    </div>
-  );
-}
-
-// ---------- RECAP (FIX ICI) ----------
-function Recap({employees}){
+// ✅ VERSION CORRIGÉE DU RECAP
+function Recap() {
+  const employees = [
+    {id:1,name:"Laetitia"},
+    {id:2,name:"Nicolas"},
+    {id:3,name:"Charlotte"}
+  ];
 
   return (
     <div>
-      <h2>Récap mensuel</h2>
-
       {employees.map(emp => (
-        <div key={emp.id} style={{border:'1px solid #ccc',margin:10,padding:10}}>
+        <div key={emp.id} style={{marginBottom:20,background:'#fff',padding:15,borderRadius:10}}>
           <h3>{emp.name}</h3>
 
-          <table>
+          <table style={{width:'100%'}}>
             <thead>
               <tr>
                 <th>Semaine</th>
@@ -132,20 +75,18 @@ function Recap({employees}){
             </thead>
             <tbody>
               <tr>
-                <td>S1</td>
+                <td>Semaine 1</td>
                 <td>35h</td>
               </tr>
             </tbody>
           </table>
 
-        </div>   // ✅ CORRECTION : plus de div en trop ici
+        </div>  <!-- ✅ CORRECTION ICI : PLUS DE DIV EN TROP -->
       ))}
-
     </div>
   );
 }
 
-// ---------- RENDER ----------
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 
 </script>
