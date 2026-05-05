@@ -82,12 +82,23 @@ const getWeekDays = mon => Array.from({length:7},(_,i)=>addDays(mon,i));
 const parseH = val => {
   if(!val) return 0;
   const s=val.trim().toUpperCase();
-  if(["OFF","CONGÉ","CONGE","RTT","MALADIE","ABSENCE","OFF/FÉRIÉ","OFF/FERIE"].some(x=>s===x||s.startsWith(x))) return 0;
-  const m=s.match(/(\d{1,2})[h:](\d{0,2})\s*[\/\-]\s*(\d{1,2})[h:](\d{0,2})/);
-  if(!m) return 0;
-  const a=parseInt(m[1])*60+(parseInt(m[2])||0), b=parseInt(m[3])*60+(parseInt(m[4])||0);
-  const diff=b-a; if(diff<=0) return 0;
-  return Math.round((diff>360?diff-60:diff)/60*10)/10;
+  if(["OFF","CONGÉ","CONGE","RTT","MALADIE","ABSENCE","OFF/FÉRIÉ","OFF/FERIE"].some(x=>s===x||s.startsWith(x+' ')||s===x)) return 0;
+  // Cherche deux horaires séparés par / ou - : ex "10h00/18h00" ou "11h30/19h30"
+  const m=s.match(/(\d{1,2})h(\d{2})\s*[\/\-]\s*(\d{1,2})h(\d{2})/);
+  if(m){
+    const a=parseInt(m[1])*60+parseInt(m[2]);
+    const b=parseInt(m[3])*60+parseInt(m[4]);
+    const diff=b-a; if(diff<=0) return 0;
+    return Math.round((diff>360?diff-60:diff)/60*10)/10;
+  }
+  // Format sans minutes : "10h/18h"
+  const m2=s.match(/(\d{1,2})h\s*[\/\-]\s*(\d{1,2})h/);
+  if(m2){
+    const a=parseInt(m2[1])*60, b=parseInt(m2[2])*60;
+    const diff=b-a; if(diff<=0) return 0;
+    return Math.round((diff>360?diff-60:diff)/60*10)/10;
+  }
+  return 0;
 };
 
 const isAbs = val => {
