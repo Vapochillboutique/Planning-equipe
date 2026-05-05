@@ -71,7 +71,7 @@ for(let h=10;h<=19;h++){const mx=h===19?30:45;for(let m=0;m<=mx;m+=15)TIME_SLOTS
 // ── Utilitaires ───────────────────────────────────────────────────────────────
 const pad   = n => String(n).padStart(2,'0');
 const dk    = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-const isWE  = d => d.getDay()===0||d.getDay()===6;
+const isWE  = d => d.getDay()===0; // Seul le dimanche est férié
 const addDays = (d,n) => { const r=new Date(d); r.setDate(r.getDate()+n); return r; };
 const getMon  = d => { const r=new Date(d); const day=r.getDay(); r.setDate(r.getDate()+(day===0?-6:1-day)); r.setHours(0,0,0,0); return r; };
 const frDate  = d => d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
@@ -124,7 +124,7 @@ const cellTxt = val => {
   return '#1a1a2e';
 };
 
-const jouvres = (d1,d2) => { let d=new Date(d1),n=0; while(d<=d2){if(!isWE(d))n++;d.setDate(d.getDate()+1);} return n; };
+const jouvres = (d1,d2) => { let d=new Date(d1),n=0; while(d<=d2){if(d.getDay()!==0)n++;d.setDate(d.getDate()+1);} return n; };
 
 const getMonthWeeks = (y,m) => {
   const weeks=[], last=new Date(y,m+1,0); let mon=getMon(new Date(y,m,1));
@@ -312,7 +312,7 @@ function App() {
   const monthStats = (empId,y,m) => {
     const d=new Date(y,m,1); let hT=0,hS=0,cpJ=0,rttJ=0,malJ=0,fJ=0,jo=0;
     while(d.getMonth()===m){
-      if(!isWE(d)) jo++;
+      if(!isWE(d)) jo++; // dimanche exclu
       const k=dk(d),cv=getCellVal(empId,k);
       if(cv){
         const v=(cv.val||'').toUpperCase(),h=parseH(cv.val);
@@ -343,8 +343,8 @@ function App() {
   // ── PLANNING (vue Notion : jours à gauche, noms en haut) ──────────────────
   const renderPlanning = () => {
     const weekDays = getWeekDays(monday);
-    const ouvrés   = weekDays.filter(d=>!isWE(d));
-    const samDim   = weekDays.filter(d=>isWE(d));
+    const ouvrés   = weekDays.filter(d=>d.getDay()!==0); // Lun→Sam travaillés
+    const dimanche = weekDays.filter(d=>d.getDay()===0); // Dimanche seul
 
     return (
       <div>
@@ -426,11 +426,11 @@ function App() {
                 );
               })}
 
-              {/* Séparateur week-end */}
+              {/* Séparateur dimanche */}
               <tr style={{background:'#f8f8f8',borderTop:'2px solid #ebebeb',borderBottom:'1px solid #ebebeb'}}>
-                <td colSpan={employees.length+2} style={{padding:'4px 16px',fontSize:10,fontWeight:700,color:'#ccc',textTransform:'uppercase',letterSpacing:'0.5px',position:'sticky',left:0}}>Week-end</td>
+                <td colSpan={employees.length+2} style={{padding:'4px 16px',fontSize:10,fontWeight:700,color:'#ccc',textTransform:'uppercase',letterSpacing:'0.5px',position:'sticky',left:0}}>Dimanche</td>
               </tr>
-              {samDim.map((d,di)=>{
+              {dimanche.map((d,di)=>{
                 const k=dk(d), jourNom=JOURS[d.getDay()===0?6:d.getDay()-1];
                 return (
                   <tr key={k} style={{borderBottom:'1px solid #f0f0f0',background:'#f9f9f9'}}>
