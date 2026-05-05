@@ -686,37 +686,38 @@ function App() {
   // ── RECAP ────────────────────────────────────────────────────────────────
   const exportRecap = () => {
     const mLabel = frMonth(recapY,recapM).toUpperCase();
-    let txt = `╔${'═'.repeat(58)}╗\n`;
-    txt += `║  COMPTE RENDU MENSUEL — ${mLabel.padEnd(31)}║\n`;
-    txt += `╚${'═'.repeat(58)}╝\n\n`;
+    const ligne1 = '='.repeat(60);
+    const ligne2 = '-'.repeat(60);
+    let txt = ligne1 + '\n';
+    txt += '  COMPTE RENDU MENSUEL - ' + mLabel + '\n';
+    txt += ligne1 + '\n\n';
     employees.forEach(emp => {
       const s = monthStats(emp.id,recapY,recapM);
-      txt += `┌${'─'.repeat(56)}┐\n`;
-      txt += `│  ${emp.name.toUpperCase().padEnd(54)}│\n`;
-      txt += `├${'─'.repeat(56)}┤\n`;
-      txt += `│  Jours ouvrés    : ${String(s.jo+'j').padEnd(36)}│\n`;
-      txt += `│  Heures théorique: ${String(s.hTheo+'h').padEnd(36)}│\n`;
-      txt += `│  Heures travaillé: ${String(s.hT+'h').padEnd(36)}│\n`;
-      if(s.hS>0)   txt += `│  H. supplémentair: ${String('+'+s.hS+'h').padEnd(36)}│\n`;
-      if(s.ftJ>0){
-        txt += `│  Fériés travaillé: ${String(s.ftJ+'j — '+s.hFerieBase+'h base → +25% = '+s.hFerieMaj+'h').padEnd(36)}│\n`;
-      }
-      txt += `│  TOTAL           : ${String(s.hTot+'h').padEnd(36)}│\n`;
-      const ecartStr = s.ecart===0?'✓ Parfait':s.ecart>0?'+'+s.ecart+'h':s.ecart+'h';
-      txt += `│  Écart / 35h/sem : ${ecartStr.padEnd(36)}│\n`;
-      txt += `├${'─'.repeat(56)}┤\n`;
-      txt += `│  Congés payés    : ${String(s.cpJ+'j').padEnd(36)}│\n`;
-      txt += `│  RTT             : ${String(s.rttJ+'j').padEnd(36)}│\n`;
-      txt += `│  Maladie         : ${String(s.malJ+'j').padEnd(36)}│\n`;
-      txt += `│  Jours fériés OFF: ${String(s.fJ+'j').padEnd(36)}│\n`;
-      txt += `└${'─'.repeat(56)}┘\n\n`;
+      txt += ligne2 + '\n';
+      txt += '  ' + emp.name.toUpperCase() + '\n';
+      txt += ligne2 + '\n';
+      txt += '  Jours ouvres     : ' + s.jo + 'j\n';
+      txt += '  Heures theoriques: ' + s.hTheo + 'h\n';
+      txt += '  Heures travaillees: ' + s.hT + 'h\n';
+      if(s.hS>0)  txt += '  H. supplementaires: +' + s.hS + 'h\n';
+      if(s.ftJ>0) txt += '  Feries travailles : ' + s.ftJ + 'j - ' + s.hFerieBase + 'h x1.25 = ' + s.hFerieMaj + 'h\n';
+      txt += '  TOTAL            : ' + s.hTot + 'h\n';
+      const ecartStr = s.ecart===0 ? 'Parfait' : (s.ecart>0 ? '+'+s.ecart+'h' : s.ecart+'h');
+      txt += '  Ecart / 35h sem  : ' + ecartStr + '\n';
+      txt += '\n';
+      txt += '  Conges payes     : ' + s.cpJ + 'j\n';
+      txt += '  RTT              : ' + s.rttJ + 'j\n';
+      txt += '  Maladie          : ' + s.malJ + 'j\n';
+      txt += '  Jours feries OFF : ' + s.fJ + 'j\n';
+      txt += ligne2 + '\n\n';
     });
-    txt += `\nExport généré le ${new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})} — Planning Équipe\n`;
+    txt += '\nExport genere le ' + new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) + ' - Planning Equipe\n';
     const blob = new Blob([txt], {type:'text/plain;charset=utf-8'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Compte_rendu_${frMonth(recapY,recapM).replace(' ','_')}.txt`;
+    const fname = 'Compte_rendu_' + frMonth(recapY,recapM).split(' ').join('_') + '.txt';
+    a.download = fname;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -910,9 +911,9 @@ function App() {
                 <option value="">Fin</option>{TIME_SLOTS.filter(t=>!mDeb||t>mDeb).map(t=><option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            {duree&&<div style={{background: mFerie?'#fff7ed':isChateau?'#fff8e1':'#eff6ff',borderRadius:8,padding:'6px 10px',marginBottom:12,fontSize:12,color:mFerie?'#c2410c':isChateau?'#b45309':'#1a6ed8',border:`1px solid ${mFerie?'#fed7aa':isChateau?'#fde68a':'#bfdbfe'}`}}>
-              {mFerie?'🔶':isChateau?'🏰':'⏱'} {mDeb} → {mFin} = <strong>{duree}h</strong>
-              <span style={{fontSize:10,marginLeft:5,opacity:0.7}}>(pause {isChateau?(isSam?'1h':'1h30'):dureeRaw>360?'1h':'aucune'})</span>
+            {duree&&<div style={{background: mFerie?'#fff7ed':isChateau?'#fff8e1':'#eff6ff',borderRadius:8,padding:'6px 10px',marginBottom:12,fontSize:12,color:mFerie?'#c2410c':isChateau?'#b45309':'#1a6ed8',border:'1px solid '+(mFerie?'#fed7aa':isChateau?'#fde68a':'#bfdbfe')}}>
+              {mFerie?'Ferie travaille':isChateau?'Chateau':'Horaires'}{' '}{mDeb}{' -> '}{mFin}{' = '}<strong>{duree}h</strong>
+              <span style={{fontSize:10,marginLeft:5,opacity:0.7}}>{'(pause '+(isChateau?(isSam?'1h':'1h30'):dureeRaw>360?'1h':'aucune')+')'}</span>
             </div>}
           </>}
 
@@ -927,9 +928,17 @@ function App() {
               style={{width:75,border:'1.5px solid #e5e7eb',borderRadius:8,padding:'8px 10px',fontSize:14,textAlign:'center',background:'#f8f9fa'}}/>
             <span style={{color:'#888',fontSize:12}}>h supp. ce jour</span>
           </div>
-          {(mLieu||mAbs||mDeb||mFerie)&&<div style={{background:mFerie?'#fff7ed':'#f8f9fa',borderRadius:8,padding:'7px 10px',marginBottom:14,fontSize:12,color:mFerie?'#c2410c':'#555',border:`1px solid ${mFerie?'#fed7aa':'#e5e7eb'}`}}>
-            📋 <strong>{mFerie&&mDeb&&mFin?`Férié travaillé ${mDeb}/${mFin}`:mAbs||(mLieu&&mDeb&&mFin?`${mLieu} ${mDeb}/${mFin}`:mLieu||(mDeb&&mFin?`${mDeb}/${mFin}`:''))}</strong>
-            {mHS>0&&<span style={{color:'#d97706'}}> + ⚡{mHS}h</span>}
+          {(mLieu||mAbs||mDeb||mFerie)&&<div style={{background:mFerie?'#fff7ed':'#f8f9fa',borderRadius:8,padding:'7px 10px',marginBottom:14,fontSize:12,color:mFerie?'#c2410c':'#555',border:'1px solid '+(mFerie?'#fed7aa':'#e5e7eb')}}>
+            {'📋 '}
+            <strong>{
+              mFerie&&mDeb&&mFin ? ('Ferie travaille '+mDeb+'/'+mFin)
+              : mAbs ? mAbs
+              : (mLieu&&mDeb&&mFin) ? (mLieu+' '+mDeb+'/'+mFin)
+              : mLieu ? mLieu
+              : (mDeb&&mFin) ? (mDeb+'/'+mFin)
+              : ''
+            }</strong>
+            {mHS>0&&<span style={{color:'#d97706'}}>{' + h supp: +'+mHS+'h'}</span>}
           </div>}
           <div style={{display:'flex',gap:7}}>
             <button onClick={saveModal} style={{flex:1,padding:'11px 0',borderRadius:9,border:'none',background:'#1a6ed8',color:'#fff',fontWeight:800,fontSize:14,cursor:'pointer'}}>✓ Enregistrer</button>
