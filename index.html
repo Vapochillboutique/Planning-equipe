@@ -79,27 +79,41 @@ const frDateS = s => new Date(s+'T12:00').toLocaleDateString('fr-FR',{day:'2-dig
 const frMonth = (y,m) => new Date(y,m,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
 const getWeekDays = mon => Array.from({length:7},(_,i)=>addDays(mon,i));
 
-const parseH = val => {
+const parseH = (val, jour) => {
   if(!val) return 0;
   const up = val.trim().toUpperCase();
-  // Absences = 0h
-  if(["OFF","CONGÉ","CONGE","RTT","MALADIE","ABSENCE","OFF/FÉRIÉ","OFF/FERIE"].some(x=>up===x||up.startsWith(x+' '))) return 0;
-  // Regex sur la valeur ORIGINALE (pas uppercase) avec flag /i pour trouver h ou H
+  // Absences pures = 0h (mais PAS Férié travaillé)
+  if(!up.includes('TRAVAILLÉ') && !up.includes('TRAVAILLE')) {
+    if(["OFF","CONGÉ","CONGE","RTT","MALADIE","ABSENCE","OFF/FÉRIÉ","OFF/FERIE"].some(x=>up===x||up.startsWith(x+' '))) return 0;
+  }
+  // Regex sur valeur originale avec flag /i
   const m = val.match(/(\d{1,2})[hH](\d{2})\s*[\/\-]\s*(\d{1,2})[hH](\d{2})/i);
+  let diff = 0;
   if(m){
     const a=parseInt(m[1])*60+parseInt(m[2]);
     const b=parseInt(m[3])*60+parseInt(m[4]);
-    const diff=b-a; if(diff<=0) return 0;
-    return Math.round((diff>360?diff-60:diff)/60*10)/10;
-  }
-  // Format sans minutes : "10h/18h"
-  const m2 = val.match(/(\d{1,2})[hH]\s*[\/\-]\s*(\d{1,2})[hH]/i);
-  if(m2){
+    diff=b-a; if(diff<=0) return 0;
+  } else {
+    const m2 = val.match(/(\d{1,2})[hH]\s*[\/\-]\s*(\d{1,2})[hH]/i);
+    if(!m2) return 0;
     const a=parseInt(m2[1])*60, b=parseInt(m2[2])*60;
-    const diff=b-a; if(diff<=0) return 0;
-    return Math.round((diff>360?diff-60:diff)/60*10)/10;
+    diff=b-a; if(diff<=0) return 0;
   }
-  return 0;
+
+  // Pause selon lieu et jour
+  const isChateau = up.includes('CHÂTEAU') || up.includes('CHATEAU');
+  const isSam = jour !== undefined ? jour === 6 : false;
+
+  let pause = 0;
+  if(diff > 360) { // plus de 6h → pause déduite
+    if(isChateau) {
+      pause = isSam ? 60 : 90; // Château : 1h sam, 1h30 lun-ven
+    } else {
+      pause = 60; // Standard : 1h
+    }
+  }
+
+  return Math.round((diff - pause) / 60 * 10) / 10;
 };
 
 const isAbs = val => {
@@ -112,6 +126,7 @@ const cellBg = (val,ei) => {
   if(!val) return '#fff';
   const v=val.trim().toUpperCase();
   if(v==="OFF"||v==="") return '#f8f8f8';
+  if(/FÉRIÉ TRAVAILLÉ|FERIE TRAVAILLE/.test(v)) return '#fff0e0';
   if(v.includes("FÉRIÉ")||v.includes("FERIE")) return '#fff8e1';
   if(v.includes("CONGÉ")||v.includes("CONGE")) return '#e8f8f0';
   if(v==="RTT") return '#e8f0ff';
@@ -126,6 +141,7 @@ const cellTxt = val => {
   if(!val) return '#ccc';
   const v=val.trim().toUpperCase();
   if(v==="OFF") return '#aaa';
+  if(/FÉRIÉ TRAVAILLÉ|FERIE TRAVAILLE/.test(v)) return '#c2410c';
   if(v.includes("FÉRIÉ")||v.includes("FERIE")) return '#b45309';
   if(v.includes("CONGÉ")||v.includes("CONGE")) return '#065f46';
   if(v==="RTT") return '#1e40af';
@@ -217,6 +233,7 @@ function App() {
   const [mDeb,     setMDeb]     = React.useState('');
   const [mFin,     setMFin]     = React.useState('');
   const [mHS,      setMHS]      = React.useState(0);
+  const [mFerie,   setMFerie]   = React.useState(false);
 
   // Congés form
   const [cgEmp,    setCgEmp]    = React.useState('');
@@ -282,16 +299,22 @@ function App() {
   // Modal
   const openModal = (empId,date,dayIdx) => {
     const k=dk(date),c=(cells[empId]||{})[k]||{},val=c.val||'';
-    setMAbs(ABSENCES.find(a=>val.toUpperCase().startsWith(a.toUpperCase()))||'');
-    setMLieu(LIEUX.find(l=>val.toUpperCase().startsWith(l.toUpperCase()))||'');
-    const m=val.match(/(\d{1,2}h\d{0,2})\s*\/\s*(\d{1,2}h\d{0,2})/i);
-    setMDeb(m?m[1]:''); setMFin(m?m[2]:''); setMHS(c.hsupp||0);
+    const isFT = /férié travaillé|ferie travaille/i.test(val);
+    setMFerie(isFT);
+    setMAbs(isFT ? '' : (ABSENCES.find(a=>val.toUpperCase().startsWith(a.toUpperCase()))||''));
+    setMLieu(isFT ? '' : (LIEUX.find(l=>val.toUpperCase().startsWith(l.toUpperCase()))||''));
+    const m=val.match(/(\d{1,2})[hH](\d{2})\s*\/\s*(\d{1,2})[hH](\d{2})/i);
+    setMDeb(m?`${m[1]}h${m[2]}`:''); setMFin(m?`${m[3]}h${m[4]}`:''); setMHS(c.hsupp||0);
     setModal({empId,date,k,dayIdx});
   };
   const saveModal = async () => {
     if(!modal) return;
     const {empId,k}=modal;
-    let val=mAbs||(mDeb&&mFin?(mLieu?`${mLieu} ${mDeb}/${mFin}`:`${mDeb}/${mFin}`):(mLieu||''));
+    let val='';
+    if(mFerie && mDeb && mFin) val=`Férié travaillé ${mDeb}/${mFin}`;
+    else if(mAbs) val=mAbs;
+    else if(mDeb&&mFin) val=mLieu?`${mLieu} ${mDeb}/${mFin}`:`${mDeb}/${mFin}`;
+    else if(mLieu) val=mLieu;
     const nc={...cells,[empId]:{...(cells[empId]||{})}};
     if(val||Number(mHS)>0) nc[empId][k]={val,hsupp:Number(mHS)||0};
     else delete nc[empId][k];
@@ -303,7 +326,7 @@ function App() {
     const nc={...cells,[empId]:{...(cells[empId]||{})}};
     delete nc[empId][k];
     setCells(nc); await saveCells(nc);
-    setMLieu('');setMAbs('');setMDeb('');setMFin('');setMHS(0);setModal(null);
+    setMLieu('');setMAbs('');setMDeb('');setMFin('');setMHS(0);setMFerie(false);setModal(null);
   };
 
   // Stats
@@ -317,19 +340,20 @@ function App() {
 
   const weekStats = (empId,wDays) => {
     let h=0,hs=0;
-    wDays.forEach(d=>{const cv=getCellVal(empId,dk(d));if(cv){h+=parseH(cv.val);if(cv.hsupp)hs+=Number(cv.hsupp);}});
+    wDays.forEach(d=>{const cv=getCellVal(empId,dk(d));if(cv){h+=parseH(cv.val,d.getDay());if(cv.hsupp)hs+=Number(cv.hsupp);}});
     return {h:Math.round(h*10)/10,hs,diff:Math.round((h+hs-H_SEM)*10)/10};
   };
 
   const monthStats = (empId,y,m) => {
-    const d=new Date(y,m,1); let hT=0,hS=0,cpJ=0,rttJ=0,malJ=0,fJ=0,jo=0;
+    const d=new Date(y,m,1); let hT=0,hS=0,cpJ=0,rttJ=0,malJ=0,fJ=0,ftJ=0,jo=0;
     while(d.getMonth()===m){
-      if(!isWE(d)) jo++; // dimanche exclu
+      if(!isWE(d)) jo++;
       const k=dk(d),cv=getCellVal(empId,k);
       if(cv){
-        const v=(cv.val||'').toUpperCase(),h=parseH(cv.val);
+        const v=(cv.val||'').toUpperCase(),h=parseH(cv.val,d.getDay());
         hT+=h;if(cv.hsupp)hS+=Number(cv.hsupp);
-        if(v.includes('CONGÉ')||v.includes('CONGE'))cpJ++;
+        if(/FÉRIÉ TRAVAILLÉ|FERIE TRAVAILLE/.test(v)) ftJ++;
+        else if(v.includes('CONGÉ')||v.includes('CONGE'))cpJ++;
         else if(v==='RTT')rttJ++;
         else if(v==='MALADIE')malJ++;
         else if(v.includes('FÉRIÉ')||v.includes('FERIE'))fJ++;
@@ -337,7 +361,7 @@ function App() {
       d.setDate(d.getDate()+1);
     }
     const hTheo=jo*H_STD,hTot=hT+hS,ecart=Math.round((hTot-hTheo)*10)/10;
-    return {hT:Math.round(hT*10)/10,hS,hTheo,hTot:Math.round(hTot*10)/10,ecart,cpJ,rttJ,malJ,fJ,jo};
+    return {hT:Math.round(hT*10)/10,hS,hTheo,hTot:Math.round(hTot*10)/10,ecart,cpJ,rttJ,malJ,fJ,ftJ,jo};
   };
 
   // Styles communs
@@ -407,7 +431,7 @@ function App() {
                     {/* Cellules employés */}
                     {employees.map((emp,ei)=>{
                       const cv=getCellVal(emp.id,k);
-                      const bg=cellBg(cv?.val,ei), tc=cellTxt(cv?.val), h=parseH(cv?.val);
+                      const bg=cellBg(cv?.val,ei), tc=cellTxt(cv?.val), h=parseH(cv?.val,d.getDay());
                       return (
                         <td key={emp.id}
                           className={isAdmin&&!cv?.fromCg?'cell':''}
@@ -661,7 +685,7 @@ function App() {
               <span style={{fontSize:11,color:'#aaa'}}>{s.jo} jours ouvrés · {s.hTheo}h théoriques</span>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:8,marginBottom:14}}>
-              {[{l:'H.trav.',v:s.hT,u:'h',c:'#1a6ed8'},{l:'H.supp.',v:s.hS,u:'h',c:'#d97706'},{l:'Total',v:s.hTot,u:'h',c:s.ecart>=0?'#059669':'#dc2626'},{l:'Écart',v:s.ecart,u:'h',c:s.ecart>=0?'#059669':'#dc2626',p:s.ecart>0?'+':''},{l:'CP',v:s.cpJ,u:'j',c:'#065f46'},{l:'RTT',v:s.rttJ,u:'j',c:'#1e40af'},{l:'Maladie',v:s.malJ,u:'j',c:'#991b1b'},{l:'Férié',v:s.fJ,u:'j',c:'#b45309'}]
+              {[{l:'H.trav.',v:s.hT,u:'h',c:'#1a6ed8'},{l:'H.supp.',v:s.hS,u:'h',c:'#d97706'},{l:'Total',v:s.hTot,u:'h',c:s.ecart>=0?'#059669':'#dc2626'},{l:'Écart',v:s.ecart,u:'h',c:s.ecart>=0?'#059669':'#dc2626',p:s.ecart>0?'+':''},{l:'CP',v:s.cpJ,u:'j',c:'#065f46'},{l:'RTT',v:s.rttJ,u:'j',c:'#1e40af'},{l:'Maladie',v:s.malJ,u:'j',c:'#991b1b'},{l:'Férié OFF',v:s.fJ,u:'j',c:'#b45309'},{l:'Férié trav.',v:s.ftJ,u:'j',c:'#c2410c'}]
                 .map(({l,v,u,c,p=''})=><div key={l} style={{background:c+'11',border:`1px solid ${c}22`,borderRadius:8,padding:'8px 10px'}}>
                   <div style={{fontSize:10,color:'#aaa',fontWeight:600,textTransform:'uppercase',marginBottom:2}}>{l}</div>
                   <div style={{fontSize:18,fontWeight:800,color:c}}>{p}{v}<span style={{fontSize:10,color:'#aaa',marginLeft:1}}>{u}</span></div>
@@ -739,8 +763,12 @@ function App() {
   const renderModal = () => {
     if(!modal) return null;
     const emp=employees.find(e=>e.id===modal.empId), ei=employees.findIndex(e=>e.id===modal.empId);
-    const toMin=t=>{const[h,m]=t.replace('h',':').split(':');return parseInt(h)*60+(parseInt(m)||0);};
-    const duree=mDeb&&mFin?Math.round(Math.max(0,toMin(mFin)-toMin(mDeb)>360?toMin(mFin)-toMin(mDeb)-60:toMin(mFin)-toMin(mDeb))/60*10)/10:null;
+    const toMin=t=>{const[h,m]=t.replace(/[hH]/,':').split(':');return parseInt(h)*60+(parseInt(m)||0);};
+    const dureeRaw = mDeb&&mFin ? toMin(mFin)-toMin(mDeb) : 0;
+    const isChateau = mLieu.toUpperCase().includes('CHÂTEAU') || mLieu.toUpperCase().includes('CHATEAU');
+    const isSam = modal?.date?.getDay() === 6;
+    const pauseMin = dureeRaw > 360 ? (isChateau ? (isSam ? 60 : 90) : 60) : 0;
+    const duree = mDeb&&mFin ? Math.round(Math.max(0, dureeRaw - pauseMin)/60*10)/10 : null;
     const selSt={flex:1,border:'1.5px solid #e5e7eb',borderRadius:9,padding:'8px 7px',fontSize:13,color:'#1a1a2e',background:'#f8f9fa'};
     return (
       <div onClick={e=>e.target===e.currentTarget&&setModal(null)} style={{position:'fixed',inset:0,background:'#00000060',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,backdropFilter:'blur(3px)'}}>
@@ -749,10 +777,20 @@ function App() {
           <div style={{fontSize:12,color:'#aaa',marginBottom:18}}>{JOURS[modal.dayIdx]} {frDate(modal.date)}</div>
           <label style={lbl}>Lieu de travail</label>
           <div style={{display:'flex',flexWrap:'wrap',gap:5,marginBottom:14}}>
-            {LIEUX.map(l=><button key={l} onClick={()=>{setMLieu(l===mLieu?'':l);setMAbs('');}}
+            {LIEUX.map(l=><button key={l} onClick={()=>{setMLieu(l===mLieu?'':l);setMAbs('');setMFerie(false);}}
               style={{padding:'5px 10px',borderRadius:20,border:`1.5px solid ${mLieu===l?'#1a6ed8':'#e5e7eb'}`,background:mLieu===l?'#1a6ed8':'#fff',color:mLieu===l?'#fff':'#555',fontWeight:600,fontSize:12,cursor:'pointer'}}>{l}</button>)}
           </div>
-          {!mAbs&&<>
+
+          {/* Férié travaillé */}
+          <div style={{marginBottom:14}}>
+            <button onClick={()=>{setMFerie(f=>!f);if(!mFerie){setMAbs('');setMLieu('');}}}
+              style={{padding:'6px 14px',borderRadius:20,border:`1.5px solid ${mFerie?'#c2410c':'#e5e7eb'}`,background:mFerie?'#fff0e0':'#fff',color:mFerie?'#c2410c':'#555',fontWeight:700,fontSize:12,cursor:'pointer'}}>
+              🔶 Férié travaillé
+            </button>
+            {mFerie&&<span style={{marginLeft:8,fontSize:11,color:'#c2410c',fontWeight:600}}>Les heures seront comptabilisées + signalées</span>}
+          </div>
+
+          {(!mAbs)&&<>
             <label style={lbl}>Horaires ⏱</label>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
               <select value={mDeb} onChange={e=>{setMDeb(e.target.value);if(!mFin||e.target.value>=mFin)setMFin('');}} style={selSt}>
@@ -763,11 +801,15 @@ function App() {
                 <option value="">Fin</option>{TIME_SLOTS.filter(t=>!mDeb||t>mDeb).map(t=><option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            {duree&&<div style={{background:'#eff6ff',borderRadius:8,padding:'6px 10px',marginBottom:12,fontSize:12,color:'#1a6ed8',border:'1px solid #bfdbfe'}}>⏱ {mDeb} → {mFin} = <strong>{duree}h</strong></div>}
+            {duree&&<div style={{background: mFerie?'#fff7ed':isChateau?'#fff8e1':'#eff6ff',borderRadius:8,padding:'6px 10px',marginBottom:12,fontSize:12,color:mFerie?'#c2410c':isChateau?'#b45309':'#1a6ed8',border:`1px solid ${mFerie?'#fed7aa':isChateau?'#fde68a':'#bfdbfe'}`}}>
+              {mFerie?'🔶':isChateau?'🏰':'⏱'} {mDeb} → {mFin} = <strong>{duree}h</strong>
+              <span style={{fontSize:10,marginLeft:5,opacity:0.7}}>(pause {isChateau?(isSam?'1h':'1h30'):dureeRaw>360?'1h':'aucune'})</span>
+            </div>}
           </>}
+
           <label style={lbl}>Absence</label>
           <div style={{display:'flex',flexWrap:'wrap',gap:5,marginBottom:14}}>
-            {ABSENCES.map(a=><button key={a} onClick={()=>{setMAbs(a===mAbs?'':a);if(a!==mAbs){setMLieu('');setMDeb('');setMFin('');}}}
+            {ABSENCES.map(a=><button key={a} onClick={()=>{setMAbs(a===mAbs?'':a);if(a!==mAbs){setMLieu('');setMDeb('');setMFin('');setMFerie(false);}}}
               style={{padding:'5px 10px',borderRadius:20,border:`1.5px solid ${mAbs===a?'#dc2626':'#e5e7eb'}`,background:mAbs===a?'#dc2626':'#fff',color:mAbs===a?'#fff':'#555',fontWeight:600,fontSize:12,cursor:'pointer'}}>{a}</button>)}
           </div>
           <label style={lbl}>Heures supplémentaires ⚡</label>
@@ -776,8 +818,8 @@ function App() {
               style={{width:75,border:'1.5px solid #e5e7eb',borderRadius:8,padding:'8px 10px',fontSize:14,textAlign:'center',background:'#f8f9fa'}}/>
             <span style={{color:'#888',fontSize:12}}>h supp. ce jour</span>
           </div>
-          {(mLieu||mAbs||mDeb)&&<div style={{background:'#f8f9fa',borderRadius:8,padding:'7px 10px',marginBottom:14,fontSize:12,color:'#555',border:'1px solid #e5e7eb'}}>
-            📋 <strong>{mAbs||(mLieu&&mDeb&&mFin?`${mLieu} ${mDeb}/${mFin}`:mLieu||(mDeb&&mFin?`${mDeb}/${mFin}`:''))}</strong>
+          {(mLieu||mAbs||mDeb||mFerie)&&<div style={{background:mFerie?'#fff7ed':'#f8f9fa',borderRadius:8,padding:'7px 10px',marginBottom:14,fontSize:12,color:mFerie?'#c2410c':'#555',border:`1px solid ${mFerie?'#fed7aa':'#e5e7eb'}`}}>
+            📋 <strong>{mFerie&&mDeb&&mFin?`Férié travaillé ${mDeb}/${mFin}`:mAbs||(mLieu&&mDeb&&mFin?`${mLieu} ${mDeb}/${mFin}`:mLieu||(mDeb&&mFin?`${mDeb}/${mFin}`:''))}</strong>
             {mHS>0&&<span style={{color:'#d97706'}}> + ⚡{mHS}h</span>}
           </div>}
           <div style={{display:'flex',gap:7}}>
