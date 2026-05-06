@@ -554,7 +554,7 @@ function App() {
     return (
       <div>
         <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
-          <h2 style={{fontSize:20,fontWeight:800,color:'#1a1a2e'}}>Gestion des conges</h2>
+          <h2 style={{fontSize:20,fontWeight:800,color:'#1a1a2e'}}>🏖️ Gestion des conges</h2>
           <span style={{fontSize:11,fontWeight:700,color:sync.includes('Synchro')?'#059669':sync.includes('Err')?'#dc2626':'#d97706'}}>{sync}</span>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 320px',gap:16,alignItems:'start'}}>
@@ -676,14 +676,14 @@ function App() {
     return (
       <div>
         <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20,flexWrap:'wrap'}}>
-          <h2 style={{fontSize:20,fontWeight:800,color:'#1a1a2e'}}>Compte rendu mensuel</h2>
+          <h2 style={{fontSize:20,fontWeight:800,color:'#1a1a2e'}}>📊 Compte rendu mensuel</h2>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <button onClick={()=>navR(-1)} style={bs}>&#8249;</button>
             <span style={{fontSize:15,fontWeight:700,textTransform:'capitalize',minWidth:150,textAlign:'center'}}>{frM(recapY,recapM)}</span>
             <button onClick={()=>navR(1)} style={bs}>&#8250;</button>
           </div>
           <button onClick={exportRecap} style={{padding:'8px 16px',borderRadius:8,border:'none',background:'#059669',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer'}}>
-            Exporter .txt
+            ⬇️ Exporter .txt
           </button>
         </div>
         {employees.map(function(emp,ei){
@@ -801,7 +801,7 @@ function App() {
 
   const renderEquipe = () => (
     <div style={{maxWidth:480}}>
-      <h2 style={{fontSize:20,fontWeight:800,color:'#1a1a2e',marginBottom:18}}>Gestion de l equipe</h2>
+      <h2 style={{fontSize:20,fontWeight:800,color:'#1a1a2e',marginBottom:18}}>👥 Gestion de l équipe</h2>
       {employees.map((emp,ei)=>(
         <div key={emp.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',background:'#fff',borderRadius:10,marginBottom:7,border:'1px solid #e5e7eb',borderLeft:'4px solid '+eAcc(ei)}}>
           <span style={{color:eAcc(ei)}}>•</span>
@@ -850,7 +850,7 @@ function App() {
           <div style={{marginBottom:14}}>
             <button onClick={()=>{setMFerie(f=>!f);if(!mFerie){setMAbs('');setMLieu('');}}}
               style={{padding:'6px 14px',borderRadius:20,border:'1.5px solid '+(mFerie?'#c2410c':'#e5e7eb'),background:mFerie?'#fff0e0':'#fff',color:mFerie?'#c2410c':'#555',fontWeight:700,fontSize:12,cursor:'pointer'}}>
-              Ferie travaille
+              🔶 Ferie travaille
             </button>
             {mFerie&&<span style={{marginLeft:8,fontSize:11,color:'#c2410c',fontWeight:600}}>Heures comptabilisees +25%</span>}
           </div>
@@ -916,10 +916,10 @@ function App() {
           </div>
         </div>
         <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-          {nb('planning','Planning')}
-          {nb('conges','Conges')}
-          {nb('recap','Compte rendu')}
-          {isAdmin&&nb('equipe','Equipe')}
+          {nb('planning','📅 Planning')}
+          {nb('conges','🏖️ Congés')}
+          {nb('recap','📊 Compte rendu')}
+          {isAdmin&&nb('equipe','👥 Équipe')}
         </div>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <div style={{textAlign:'right',lineHeight:1.3}}>
