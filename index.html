@@ -227,6 +227,13 @@ function App() {
   const [selE,     setSelE]     = React.useState(null);
   const [hovD,     setHovD]     = React.useState(null);
   const [newName,  setNewName]  = React.useState('');
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 640);
+
+  React.useEffect(()=>{
+    const h = () => setIsMobile(window.innerWidth <= 640);
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, []);
   const isAdmin = session && session.role === 'admin';
 
   React.useEffect(()=>{ const s=loadS(); if(s)setSession(s); setSesOk(true); },[]);
@@ -407,6 +414,128 @@ function App() {
     const weekDays=getWD(monday);
     const ouvres=weekDays.filter(d=>!isWE(d));
     const dims=weekDays.filter(d=>isWE(d));
+
+    // ── VUE MOBILE : cartes par jour ──────────────────────────────────────
+    if(isMobile) {
+      return (
+        <div>
+          {/* Nav semaine mobile */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,gap:6}}>
+            <button onClick={()=>setMonday(p=>addD(p,-7))} style={{...bs,padding:'10px 16px',fontSize:18,borderRadius:10}}>&#8249;</button>
+            <div style={{textAlign:'center',flex:1}}>
+              <div style={{fontSize:13,fontWeight:800,color:'#1a1a2e',lineHeight:1.3}}>
+                {'Sem. '+frDC(monday)+' — '+frDC(addD(monday,5))}
+              </div>
+              <button onClick={()=>setMonday(getMon(today))} style={{marginTop:4,padding:'3px 10px',borderRadius:20,border:'none',background:'#1a6ed8',color:'#fff',fontWeight:700,fontSize:11,cursor:'pointer'}}>Aujourd hui</button>
+            </div>
+            <button onClick={()=>setMonday(p=>addD(p,7))} style={{...bs,padding:'10px 16px',fontSize:18,borderRadius:10}}>&#8250;</button>
+          </div>
+
+          {/* Tableau mobile : jours en lignes, employés en colonnes */}
+          <div style={{background:'#fff',borderRadius:14,border:'1px solid #e5e7eb',boxShadow:'0 2px 8px rgba(0,0,0,0.06)',overflow:'hidden'}}>
+            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+              <table style={{borderCollapse:'collapse',width:'100%'}}>
+                <thead>
+                  <tr style={{background:'#f8f9fa',borderBottom:'2px solid #e5e7eb'}}>
+                    <th style={{padding:'10px 8px',fontSize:11,fontWeight:700,color:'#aaa',textAlign:'center',borderRight:'2px solid #e5e7eb',position:'sticky',left:0,background:'#f8f9fa',zIndex:3,minWidth:52}}>Jour</th>
+                    {employees.map((emp,ei)=>(
+                      <th key={emp.id} style={{padding:'8px 4px',textAlign:'center',borderRight:'1px solid #f0f0f0',minWidth:80}}>
+                        <div style={{fontSize:12,fontWeight:800,color:eAcc(ei)}}>{emp.name.slice(0,8)}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {ouvres.map((d,di)=>{
+                    const k=dk(d), isT=k===dk(today);
+                    return (
+                      <tr key={k} style={{borderBottom:'1px solid #f0f0f0',background:isT?'#f0f6ff':di%2===0?'#fff':'#fafafa'}}>
+                        <td style={{padding:'8px 6px',fontWeight:700,fontSize:11,color:isT?'#1a6ed8':'#555',borderRight:'2px solid #e5e7eb',position:'sticky',left:0,background:isT?'#f0f6ff':di%2===0?'#fff':'#fafafa',zIndex:2,textAlign:'center',whiteSpace:'nowrap'}}>
+                          <div style={{fontWeight:800,fontSize:12}}>{JOURS[d.getDay()-1].slice(0,3)}</div>
+                          <div style={{fontSize:11,color:isT?'#1a6ed8':'#aaa'}}>{d.getDate()}</div>
+                        </td>
+                        {employees.map((emp,ei)=>{
+                          const cv=getCellVal(emp.id,k);
+                          const bg=cellBg(cv?cv.val:'',ei), tc=cellTxt(cv?cv.val:'');
+                          const h=cv?parseH(cv.val,d.getDay()):0;
+                          const isFT=cv&&cv.val&&cv.val.toUpperCase().includes("FERIE TRAVAIL");
+                          return (
+                            <td key={emp.id}
+                              onClick={()=>isAdmin&&!(cv&&cv.fromCg)&&openModal(emp.id,d,d.getDay()-1)}
+                              style={{padding:'4px 3px',borderRight:'1px solid #f0f0f0',background:cv&&cv.val?bg:'transparent',cursor:isAdmin&&!(cv&&cv.fromCg)?'pointer':'default',textAlign:'center',verticalAlign:'middle',minWidth:80}}>
+                              {cv&&cv.val?(
+                                <div style={{padding:'4px 5px',borderRadius:7,background:bg}}>
+                                  <div style={{fontWeight:700,fontSize:10,color:tc,lineHeight:1.3,wordBreak:'break-word'}}>{cv.val}</div>
+                                  {h>0&&<div style={{fontSize:9,color:'#888'}}>{h}h</div>}
+                                  {cv.hsupp>0&&<div style={{fontSize:9,color:'#f59e0b',fontWeight:700}}>+{cv.hsupp}h</div>}
+                                  {isFT&&<div style={{fontSize:9,color:'#c2410c',fontWeight:700}}>+25%</div>}
+                                  {cv.fromCg&&<div style={{fontSize:8,color:'#888',fontStyle:'italic'}}>conge</div>}
+                                </div>
+                              ):(
+                                <div style={{color:'#ddd',fontSize:18}}>{isAdmin?'+':''}</div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                  {/* Dimanche mobile */}
+                  {dims.map(d=>{
+                    const k=dk(d);
+                    return (
+                      <tr key={k} style={{borderBottom:'1px solid #f0f0f0',background:'#f9f9f9',opacity:0.6}}>
+                        <td style={{padding:'6px',fontWeight:700,fontSize:11,color:'#ccc',borderRight:'2px solid #e5e7eb',position:'sticky',left:0,background:'#f9f9f9',zIndex:2,textAlign:'center'}}>
+                          <div style={{fontSize:11}}>Dim</div>
+                          <div style={{fontSize:11,color:'#ddd'}}>{d.getDate()}</div>
+                        </td>
+                        {employees.map((emp,ei)=>{
+                          const cv=getCellVal(emp.id,k);
+                          const bg=cellBg(cv?cv.val:'',ei), tc=cellTxt(cv?cv.val:'');
+                          return (
+                            <td key={emp.id}
+                              onClick={()=>isAdmin&&!(cv&&cv.fromCg)&&openModal(emp.id,d,6)}
+                              style={{padding:'4px 3px',borderRight:'1px solid #f0f0f0',background:cv&&cv.val?bg:'transparent',cursor:isAdmin&&!(cv&&cv.fromCg)?'pointer':'default',textAlign:'center'}}>
+                              {cv&&cv.val?(
+                                <div style={{fontSize:9,fontWeight:700,color:tc,padding:'3px 4px',borderRadius:5,background:bg}}>{cv.val}</div>
+                              ):<span style={{color:'#e5e5e5',fontSize:14}}>{isAdmin?'+':''}</span>}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                  {/* Total ligne mobile */}
+                  <tr style={{background:'#f5f6f8',borderTop:'2px solid #e5e7eb'}}>
+                    <td style={{padding:'8px 6px',fontWeight:800,fontSize:10,color:'#555',borderRight:'2px solid #e5e7eb',position:'sticky',left:0,background:'#f5f6f8',zIndex:2,textAlign:'center'}}>Total</td>
+                    {employees.map((emp,ei)=>{
+                      const ws=weekStats(emp.id,ouvres);
+                      return (
+                        <td key={emp.id} style={{padding:'8px 4px',textAlign:'center',borderRight:'1px solid #f0f0f0'}}>
+                          <div style={{fontWeight:800,fontSize:14,color:ws.tot>=H_SEM?'#059669':'#dc2626'}}>{ws.tot}h</div>
+                          {ws.diff!==0&&<div style={{fontSize:10,fontWeight:700,color:ws.diff>0?'#d97706':'#dc2626'}}>{ws.diff>0?'+'+ws.diff+'h':ws.diff+'h'}</div>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Légende mobile compacte */}
+          <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:10}}>
+            {[
+              {l:'Bureau',c:'#1a6ed8'},{l:'Chateau',c:'#78350f'},{l:'T-C',c:'#4c1d95'},
+              {l:'Tours N',c:'#14532d'},{l:'Conge',c:'#065f46'},{l:'RTT',c:'#1e40af'},
+              {l:'Maladie',c:'#991b1b'},{l:'OFF/Ferie',c:'#b45309'},{l:'Ferie trav.',c:'#c2410c'}
+            ].map(function(x){ return React.createElement('span',{key:x.l,style:{background:x.c+'15',color:x.c,border:'1px solid '+x.c+'33',borderRadius:20,padding:'2px 8px',fontSize:10,fontWeight:600}},x.l); })}
+          </div>
+        </div>
+      );
+    }
+
+    // ── VUE DESKTOP ───────────────────────────────────────────────────────
     return (
       <div>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:10}}>
@@ -557,7 +686,7 @@ function App() {
           <h2 style={{fontSize:20,fontWeight:800,color:'#1a1a2e'}}>🏖️ Gestion des conges</h2>
           <span style={{fontSize:11,fontWeight:700,color:sync.includes('Synchro')?'#059669':sync.includes('Err')?'#dc2626':'#d97706'}}>{sync}</span>
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 320px',gap:16,alignItems:'start'}}>
+        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 320px',gap:16,alignItems:'start'}}>
           <div style={{background:'#fff',borderRadius:14,padding:18,boxShadow:'0 2px 8px rgba(0,0,0,0.05)',border:'1px solid #e5e7eb'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
               <button onClick={()=>navCg(-1)} style={bs}>&#8249;</button>
@@ -567,7 +696,7 @@ function App() {
             <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>
               {['L','M','M','J','V','S','D'].map((j,i)=><div key={i} style={{textAlign:'center',fontSize:10,fontWeight:700,color:'#bbb',padding:'2px 0'}}>{j}</div>)}
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:isMobile?4:2}}>
               {Array.from({length:rows*7},function(_,i){
                 const day=i-startWD+1, ok=day>=1&&day<=lastDay.getDate();
                 const dStr=ok?cgYear+'-'+pad(cgMonth+1)+'-'+pad(day):'';
@@ -579,15 +708,15 @@ function App() {
                   onClick:()=>ok&&!we&&clickDay(day),
                   onMouseEnter:()=>ok&&selS&&!selE&&setHovD(dStr),
                   onMouseLeave:()=>setHovD(null),
-                  style:{minHeight:52,borderRadius:7,padding:2,background:isSS||isSE?'#1a6ed8':inR?'#dbeafe':we?'#f5f5f5':isT?'#eff6ff':'#fff',border:isT?'2px solid #1a6ed8':'1px solid #f0f0f0',cursor:ok&&!we&&isAdmin?'pointer':'default',opacity:ok?1:0}
+                  style:{minHeight:isMobile?48:52,borderRadius:7,padding:isMobile?3:2,background:isSS||isSE?'#1a6ed8':inR?'#dbeafe':we?'#f5f5f5':isT?'#eff6ff':'#fff',border:isT?'2px solid #1a6ed8':'1px solid #f0f0f0',cursor:ok&&!we&&isAdmin?'pointer':'default',opacity:ok?1:0}
                 }, ok&&[
-                  React.createElement('div',{key:'d',style:{fontSize:10,fontWeight:isT?800:600,color:isSS||isSE?'#fff':we?'#ccc':'#333',textAlign:'center',marginBottom:1}},day),
-                  cgsJ.slice(0,3).map(function(g){
+                  React.createElement('div',{key:'d',style:{fontSize:isMobile?13:10,fontWeight:isT?800:600,color:isSS||isSE?'#fff':we?'#ccc':'#333',textAlign:'center',marginBottom:1}},day),
+                  cgsJ.slice(0,isMobile?2:3).map(function(g){
                     const ei=employees.findIndex(e=>e.id===g.empId);
-                    return React.createElement('div',{key:g.id,style:{fontSize:8,fontWeight:700,color:'#fff',background:eAcc(ei),borderRadius:3,padding:'1px 3px',marginBottom:1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}},
-                      employees.find(e=>e.id===g.empId)?employees.find(e=>e.id===g.empId).name.slice(0,6):'?');
+                    return React.createElement('div',{key:g.id,style:{fontSize:isMobile?9:8,fontWeight:700,color:'#fff',background:eAcc(ei),borderRadius:3,padding:'1px 3px',marginBottom:1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}},
+                      employees.find(e=>e.id===g.empId)?employees.find(e=>e.id===g.empId).name.slice(0,isMobile?4:6):'?');
                   }),
-                  cgsJ.length>3&&React.createElement('div',{key:'more',style:{fontSize:7,color:'#aaa'}},'+'+( cgsJ.length-3))
+                  cgsJ.length>(isMobile?2:3)&&React.createElement('div',{key:'more',style:{fontSize:8,color:'#aaa'}},'+'+( cgsJ.length-(isMobile?2:3)))
                 ]);
               })}
             </div>
@@ -595,7 +724,7 @@ function App() {
             <div style={{display:'flex',flexWrap:'wrap',gap:5,marginTop:12,paddingTop:10,borderTop:'1px solid #f0f0f0'}}>
               {employees.map(function(emp,ei){
                 const nb=conges.filter(g=>g.empId===emp.id).length;
-                return React.createElement('span',{key:emp.id,style:{background:eAcc(ei)+'22',color:eAcc(ei),border:'1px solid '+eAcc(ei)+'44',borderRadius:6,padding:'2px 7px',fontSize:10,fontWeight:700}},
+                return React.createElement('span',{key:emp.id,style:{background:eAcc(ei)+'22',color:eAcc(ei),border:'1px solid '+eAcc(ei)+'44',borderRadius:6,padding:'3px 8px',fontSize:isMobile?12:10,fontWeight:700}},
                   emp.name+(nb>0?' ('+nb+')':''));
               })}
             </div>
@@ -676,14 +805,14 @@ function App() {
     return (
       <div>
         <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20,flexWrap:'wrap'}}>
-          <h2 style={{fontSize:20,fontWeight:800,color:'#1a1a2e'}}>📊 Compte rendu mensuel</h2>
+          <h2 style={{fontSize:isMobile?17:20,fontWeight:800,color:'#1a1a2e'}}>📊 Compte rendu mensuel</h2>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <button onClick={()=>navR(-1)} style={bs}>&#8249;</button>
-            <span style={{fontSize:15,fontWeight:700,textTransform:'capitalize',minWidth:150,textAlign:'center'}}>{frM(recapY,recapM)}</span>
+            <span style={{fontSize:isMobile?13:15,fontWeight:700,textTransform:'capitalize',minWidth:isMobile?120:150,textAlign:'center'}}>{frM(recapY,recapM)}</span>
             <button onClick={()=>navR(1)} style={bs}>&#8250;</button>
           </div>
-          <button onClick={exportRecap} style={{padding:'8px 16px',borderRadius:8,border:'none',background:'#059669',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer'}}>
-            ⬇️ Exporter .txt
+          <button onClick={exportRecap} style={{padding:'8px 14px',borderRadius:8,border:'none',background:'#059669',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer'}}>
+            ⬇️ {isMobile?'Export':'Exporter .txt'}
           </button>
         </div>
         {employees.map(function(emp,ei){
@@ -834,8 +963,8 @@ function App() {
     const duree = mDeb&&mFin?Math.round((dureeRaw-pause)/60*10)/10:null;
     const slS = {flex:1,border:'1.5px solid #e5e7eb',borderRadius:9,padding:'8px 7px',fontSize:13,color:'#1a1a2e',background:'#f8f9fa'};
     return (
-      <div onClick={e=>e.target===e.currentTarget&&setModal(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.35)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,backdropFilter:'blur(3px)'}}>
-        <div style={{background:'#fff',borderRadius:16,padding:26,width:420,maxWidth:'calc(100vw - 24px)',boxShadow:'0 20px 60px rgba(0,0,0,0.2)',border:'1px solid #e5e7eb',maxHeight:'90vh',overflowY:'auto'}}>
+      <div onClick={e=>e.target===e.currentTarget&&setModal(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.35)',display:'flex',alignItems:isMobile?'flex-end':'center',justifyContent:'center',zIndex:100,backdropFilter:'blur(3px)'}}>
+        <div style={{background:'#fff',borderRadius:isMobile?'20px 20px 0 0':'16px',padding:isMobile?'20px 16px':26,width:isMobile?'100%':420,maxWidth:'100vw',boxShadow:'0 20px 60px rgba(0,0,0,0.2)',border:'1px solid #e5e7eb',maxHeight:isMobile?'90vh':'90vh',overflowY:'auto'}}>
           <div style={{fontSize:15,fontWeight:800,marginBottom:2,color:eAcc(ei)}}>• {emp?emp.name:''}</div>
           <div style={{fontSize:12,color:'#aaa',marginBottom:18}}>{JOURS[modal.dayIdx]} {frDC(modal.date)}</div>
           <label style={lb}>Lieu de travail</label>
@@ -905,28 +1034,29 @@ function App() {
 
   return (
     <div style={{minHeight:'100vh',background:'#f5f6f8',fontFamily:"'Segoe UI',Arial,sans-serif"}}>
-      <div style={{background:'#fff',borderBottom:'1px solid #e5e7eb',padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,boxShadow:'0 1px 3px rgba(0,0,0,0.05)',position:'sticky',top:0,zIndex:10}}>
+      <div style={{background:'#fff',borderBottom:'1px solid #e5e7eb',padding:isMobile?'8px 12px':'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,boxShadow:'0 1px 3px rgba(0,0,0,0.05)',position:'sticky',top:0,zIndex:10}}>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <div style={{width:32,height:32,background:'linear-gradient(135deg,#1a6ed8,#8b1ad6)',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>
+          <div style={{width:isMobile?28:32,height:isMobile?28:32,background:'linear-gradient(135deg,#1a6ed8,#8b1ad6)',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:isMobile?14:16}}>
             <span>&#128197;</span>
           </div>
-          <div>
+          {!isMobile&&<div>
             <div style={{fontSize:14,fontWeight:800,color:'#1a1a2e',lineHeight:1}}>Planning Equipe</div>
             <div style={{fontSize:9,color:sync.includes('Synchro')?'#059669':sync.includes('Err')?'#dc2626':'#d97706',fontWeight:600}}>{sync}</div>
-          </div>
+          </div>}
+          {isMobile&&<div style={{fontSize:9,color:sync.includes('Synchro')?'#059669':sync.includes('Err')?'#dc2626':'#d97706',fontWeight:700}}>{sync}</div>}
         </div>
-        <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-          {nb('planning','📅 Planning')}
-          {nb('conges','🏖️ Congés')}
-          {nb('recap','📊 Compte rendu')}
-          {isAdmin&&nb('equipe','👥 Équipe')}
+        <div style={{display:'flex',gap:isMobile?4:5,flexWrap:'nowrap',overflowX:'auto'}}>
+          {nb('planning',isMobile?'📅':'📅 Planning')}
+          {nb('conges',isMobile?'🏖️':'🏖️ Congés')}
+          {nb('recap',isMobile?'📊':'📊 Compte rendu')}
+          {isAdmin&&nb('equipe',isMobile?'👥':'👥 Équipe')}
         </div>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
-          <div style={{textAlign:'right',lineHeight:1.3}}>
+          {!isMobile&&<div style={{textAlign:'right',lineHeight:1.3}}>
             <div style={{fontSize:12,fontWeight:700,color:'#1a1a2e'}}>{session.user}</div>
             <div style={{fontSize:10,color:isAdmin?'#8b1ad6':'#1a6ed8',fontWeight:600}}>{isAdmin?'Admin':'Lecteur'}</div>
-          </div>
-          <button onClick={()=>{clearS();setSession(null);}} style={{padding:'6px 10px',borderRadius:7,border:'1px solid #e5e7eb',background:'#f8f9fa',color:'#888',fontWeight:600,fontSize:11,cursor:'pointer'}}>Deconnexion</button>
+          </div>}
+          <button onClick={()=>{clearS();setSession(null);}} style={{padding:isMobile?'6px 8px':'6px 10px',borderRadius:7,border:'1px solid #e5e7eb',background:'#f8f9fa',color:'#888',fontWeight:600,fontSize:11,cursor:'pointer'}}>{isMobile?'↩':'Deconnexion'}</button>
         </div>
       </div>
       {!isAdmin&&(
@@ -934,7 +1064,7 @@ function App() {
           Mode consultation - Seule Laetitia peut modifier le planning.
         </div>
       )}
-      <div style={{padding:'16px',maxWidth:1400,margin:'0 auto'}}>
+      <div style={{padding:isMobile?'10px 10px':'16px',maxWidth:1400,margin:'0 auto'}}>
         {view==='planning'&&renderPlanning()}
         {view==='conges'&&renderConges()}
         {view==='recap'&&renderRecap()}
