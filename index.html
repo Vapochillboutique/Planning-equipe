@@ -249,7 +249,25 @@ function App() {
     if(!fbReady||!session) return;
     const {db,onSnapshot,collection,doc}=window.__fb;
     const u1=onSnapshot(doc(db,'planning','cells'),snap=>{if(snap.exists())setCells(snap.data().data||{});setSync('Synchronise');},()=>setSync('Erreur sync'));
-    const u2=onSnapshot(collection(db,'conges'),snap=>setConges(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    const u2=onSnapshot(collection(db,'conges'),snap=>{
+      try {
+        const list = snap.docs.map(d=>{
+          const data = d.data();
+          // Nettoyer les champs potentiellement corrompus
+          return {
+            id: d.id,
+            empId: data.empId||'',
+            type: data.type||'Conge',
+            debut: data.debut||'',
+            fin: data.fin||'',
+            note: data.note||'',
+            statut: data.statut||'valide',
+            demandeLe: data.demandeLe||''
+          };
+        }).filter(g=>g.debut&&g.fin&&g.empId); // ignorer les docs invalides
+        setConges(list);
+      } catch(e){ console.error('Erreur conges:', e); }
+    }, e=>console.error('Listener conges:', e));
     const u3=onSnapshot(doc(db,'planning','employees'),snap=>{if(snap.exists()&&snap.data().list&&snap.data().list.length>0)setEmployees(snap.data().list);});
     return()=>{u1();u2();u3();};
   },[fbReady,session]);
@@ -297,7 +315,8 @@ function App() {
     const {db,doc,setDoc}=window.__fb;
     const cg = conges.find(g=>g.id===id);
     if(!cg) return;
-    await setDoc(doc(db,'conges',id),{...cg,statut:'valide'});
+    const {id:_id, ...cgData} = cg; // exclure l'id du document
+    try { await setDoc(doc(db,'conges',id),{...cgData, statut:'valide'}); } catch(e){ console.error(e); }
   };
 
   // Admin refuse une demande
@@ -306,7 +325,8 @@ function App() {
     const {db,doc,setDoc}=window.__fb;
     const cg = conges.find(g=>g.id===id);
     if(!cg) return;
-    await setDoc(doc(db,'conges',id),{...cg,statut:'refuse'});
+    const {id:_id, ...cgData} = cg; // exclure l'id du document
+    try { await setDoc(doc(db,'conges',id),{...cgData, statut:'refuse'}); } catch(e){ console.error(e); }
   };
 
   const delCg = async id => {
