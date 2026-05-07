@@ -64,6 +64,8 @@ const USERS = [
   {user:"Marco",pass:"12345",role:"lecteur"},
   {user:"Alan",pass:"12345",role:"lecteur"},
   {user:"Corentin",pass:"12345",role:"lecteur"},
+  {user:"Mathieu",pass:"12345",role:"lecteur"},
+  {user:"Laura",pass:"12345",role:"lecteur"},
 ];
 
 const SLOTS = [];
@@ -263,13 +265,50 @@ function App() {
     const {db,doc,setDoc}=window.__fb;
     try{await setDoc(doc(db,'planning','employees'),{list});}catch(e){}
   };
+  // Employé pose une DEMANDE (statut: 'attente')
+  const demanderCg = async () => {
+    if(!cgDeb||!cgFin||!fbReady) return;
+    const {db,doc,setDoc}=window.__fb;
+    const empId = employees.find(e=>e.name===session.user)?.id;
+    if(!empId) return;
+    const id='cg'+Date.now();
+    await setDoc(doc(db,'conges',id),{
+      empId, type:cgType, debut:cgDeb, fin:cgFin, note:cgNote,
+      statut:'attente', demandeLe:new Date().toISOString()
+    });
+    setCgDeb('');setCgFin('');setCgNote('');setSelS(null);setSelE(null);
+  };
+
+  // Admin ajoute directement (statut: 'valide')
   const addCg = async () => {
     if(!cgEmp||!cgDeb||!cgFin||!fbReady) return;
     const {db,doc,setDoc}=window.__fb;
     const id='cg'+Date.now();
-    await setDoc(doc(db,'conges',id),{empId:cgEmp,type:cgType,debut:cgDeb,fin:cgFin,note:cgNote});
+    await setDoc(doc(db,'conges',id),{
+      empId:cgEmp, type:cgType, debut:cgDeb, fin:cgFin, note:cgNote,
+      statut:'valide', demandeLe:new Date().toISOString()
+    });
     setCgDeb('');setCgFin('');setCgNote('');setSelS(null);setSelE(null);
   };
+
+  // Admin valide une demande
+  const validerCg = async id => {
+    if(!fbReady) return;
+    const {db,doc,setDoc}=window.__fb;
+    const cg = conges.find(g=>g.id===id);
+    if(!cg) return;
+    await setDoc(doc(db,'conges',id),{...cg,statut:'valide'});
+  };
+
+  // Admin refuse une demande
+  const refuserCg = async id => {
+    if(!fbReady) return;
+    const {db,doc,setDoc}=window.__fb;
+    const cg = conges.find(g=>g.id===id);
+    if(!cg) return;
+    await setDoc(doc(db,'conges',id),{...cg,statut:'refuse'});
+  };
+
   const delCg = async id => {
     if(!fbReady) return;
     const {db,doc,deleteDoc}=window.__fb;
@@ -279,7 +318,8 @@ function App() {
   const getCellVal = (empId, dStr) => {
     const c = (cells[empId]||{})[dStr];
     if(c&&c.val) return c;
-    const cg = conges.find(g=>dStr>=g.debut&&dStr<=g.fin&&g.empId===empId);
+    // Seuls les congés VALIDÉS apparaissent dans le planning
+    const cg = conges.find(g=>dStr>=g.debut&&dStr<=g.fin&&g.empId===empId&&g.statut==='valide');
     if(cg) return {val:cg.type==='Conge'?'Conge':cg.type,hsupp:0,fromCg:true};
     return null;
   };
@@ -667,9 +707,12 @@ function App() {
     const startWD=firstDay.getDay()===0?6:firstDay.getDay()-1;
     const rows=Math.ceil((startWD+lastDay.getDate())/7);
     const navCg=dir=>{let m=cgMonth+dir,y=cgYear;if(m<0){m=11;y--;}if(m>11){m=0;y++;}setCgMonth(m);setCgYear(y);};
-    const getCongesJ=dStr=>conges.filter(g=>dStr>=g.debut&&dStr<=g.fin);
-    const clickDay=day=>{
-      if(!isAdmin) return;
+
+    // Congés filtrés selon le rôle
+    const myEmpId = employees.find(e=>e.name===session.user)?.id;
+    const getCongesJ = dStr => conges.filter(g=>dStr>=g.debut&&dStr<=g.fin&&(g.statut==='valide'||g.statut==='attente'));
+
+    const clickDay = day => {
       const s=cgYear+'-'+pad(cgMonth+1)+'-'+pad(day);
       if(!selS||(selS&&selE)){setSelS(s);setSelE(null);}
       else{const lo=s<selS?s:selS,hi=s<selS?selS:s;setSelS(lo);setSelE(hi);setCgDeb(lo);setCgFin(hi);}
@@ -680,18 +723,68 @@ function App() {
       if(selS&&hovD){const lo=selS<hovD?selS:hovD,hi=selS<hovD?hovD:selS;return s>=lo&&s<=hi;}
       return false;
     };
+
+    // Statut couleur
+    const statutColor = s => s==='valide'?'#059669':s==='attente'?'#d97706':'#dc2626';
+    const statutBg    = s => s==='valide'?'#ecfdf5':s==='attente'?'#fffbeb':'#fef2f2';
+    const statutLabel = s => s==='valide'?'✅ Validé':s==='attente'?'🟡 En attente':'❌ Refusé';
+
+    // Demandes en attente (pour admin)
+    const enAttente = conges.filter(g=>g.statut==='attente');
+    // Mes demandes (pour lecteur)
+    const mesDemandes = conges.filter(g=>g.empId===myEmpId);
+
     return (
       <div>
-        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
-          <h2 style={{fontSize:20,fontWeight:800,color:'#1a1a2e'}}>🏖️ Gestion des conges</h2>
-          <span style={{fontSize:11,fontWeight:700,color:sync.includes('Synchro')?'#059669':sync.includes('Err')?'#dc2626':'#d97706'}}>{sync}</span>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16,flexWrap:'wrap'}}>
+          <h2 style={{fontSize:isMobile?17:20,fontWeight:800,color:'#1a1a2e'}}>🏖️ Congés</h2>
+          <span style={{fontSize:11,fontWeight:700,color:sync.includes('Synchro')?'#059669':'#d97706'}}>{sync}</span>
         </div>
-        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 320px',gap:16,alignItems:'start'}}>
+
+        {/* ── BANDEAU ADMIN : demandes en attente ── */}
+        {isAdmin&&enAttente.length>0&&(
+          <div style={{background:'#fffbeb',border:'2px solid #fde68a',borderRadius:12,padding:16,marginBottom:16}}>
+            <div style={{fontSize:14,fontWeight:800,color:'#92400e',marginBottom:12}}>
+              {'🟡 '+enAttente.length+' demande(s) en attente de validation'}
+            </div>
+            {enAttente.map(function(g){
+              const emp=employees.find(e=>e.id===g.empId), ei=employees.findIndex(e=>e.id===g.empId);
+              const j=jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));
+              const col=CG_COLORS[g.type]||'#94a3b8';
+              return React.createElement('div',{key:g.id,style:{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'#fff',borderRadius:10,marginBottom:8,border:'1px solid #fde68a',flexWrap:'wrap'}},
+                React.createElement('div',{style:{flex:1,minWidth:180}},
+                  React.createElement('div',{style:{display:'flex',alignItems:'center',gap:6,marginBottom:3,flexWrap:'wrap'}},
+                    React.createElement('span',{style:{fontWeight:800,fontSize:13,color:eAcc(ei)}},'● '+(emp?emp.name:'?')),
+                    React.createElement('span',{style:{background:col+'22',color:col,border:'1px solid '+col+'44',borderRadius:4,padding:'1px 6px',fontSize:10,fontWeight:700}},g.type),
+                    React.createElement('span',{style:{fontSize:11,color:'#888'}},j+'j')
+                  ),
+                  React.createElement('div',{style:{fontSize:12,color:'#666'}},frDS(g.debut)+' au '+frDS(g.fin)),
+                  g.note&&React.createElement('div',{style:{fontSize:11,color:'#aaa',fontStyle:'italic'}},g.note)
+                ),
+                React.createElement('div',{style:{display:'flex',gap:6}},
+                  React.createElement('button',{onClick:()=>validerCg(g.id),style:{padding:'8px 14px',borderRadius:8,border:'none',background:'#059669',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer'}},'✅ Valider'),
+                  React.createElement('button',{onClick:()=>refuserCg(g.id),style:{padding:'8px 14px',borderRadius:8,border:'none',background:'#dc2626',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer'}},'❌ Refuser'),
+                  React.createElement('button',{onClick:()=>delCg(g.id),style:{padding:'8px 10px',borderRadius:8,border:'1px solid #e5e7eb',background:'#f8f9fa',color:'#888',fontWeight:600,fontSize:12,cursor:'pointer'}},'Suppr.')
+                )
+              );
+            })}
+          </div>
+        )}
+
+        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 340px',gap:16,alignItems:'start'}}>
+
+          {/* ── CALENDRIER ── */}
           <div style={{background:'#fff',borderRadius:14,padding:18,boxShadow:'0 2px 8px rgba(0,0,0,0.05)',border:'1px solid #e5e7eb'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
               <button onClick={()=>navCg(-1)} style={bs}>&#8249;</button>
               <span style={{fontSize:15,fontWeight:800,color:'#1a1a2e',textTransform:'capitalize'}}>{frM(cgYear,cgMonth)}</span>
               <button onClick={()=>navCg(1)} style={bs}>&#8250;</button>
+            </div>
+            {/* Légende statuts */}
+            <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+              {[{l:'Validé',c:'#059669',bg:'#ecfdf5'},{l:'En attente',c:'#d97706',bg:'#fffbeb'},{l:'Refusé',c:'#dc2626',bg:'#fef2f2'}].map(x=>
+                React.createElement('span',{key:x.l,style:{background:x.bg,color:x.c,border:'1px solid '+x.c+'33',borderRadius:20,padding:'2px 8px',fontSize:10,fontWeight:600}},x.l)
+              )}
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>
               {['L','M','M','J','V','S','D'].map((j,i)=><div key={i} style={{textAlign:'center',fontSize:10,fontWeight:700,color:'#bbb',padding:'2px 0'}}>{j}</div>)}
@@ -708,86 +801,151 @@ function App() {
                   onClick:()=>ok&&!we&&clickDay(day),
                   onMouseEnter:()=>ok&&selS&&!selE&&setHovD(dStr),
                   onMouseLeave:()=>setHovD(null),
-                  style:{minHeight:isMobile?48:52,borderRadius:7,padding:isMobile?3:2,background:isSS||isSE?'#1a6ed8':inR?'#dbeafe':we?'#f5f5f5':isT?'#eff6ff':'#fff',border:isT?'2px solid #1a6ed8':'1px solid #f0f0f0',cursor:ok&&!we&&isAdmin?'pointer':'default',opacity:ok?1:0}
+                  style:{minHeight:isMobile?50:52,borderRadius:7,padding:isMobile?3:2,
+                    background:isSS||isSE?'#1a6ed8':inR?'#dbeafe':we?'#f5f5f5':isT?'#eff6ff':'#fff',
+                    border:isT?'2px solid #1a6ed8':'1px solid #f0f0f0',
+                    cursor:ok&&!we?'pointer':'default',opacity:ok?1:0}
                 }, ok&&[
                   React.createElement('div',{key:'d',style:{fontSize:isMobile?13:10,fontWeight:isT?800:600,color:isSS||isSE?'#fff':we?'#ccc':'#333',textAlign:'center',marginBottom:1}},day),
                   cgsJ.slice(0,isMobile?2:3).map(function(g){
                     const ei=employees.findIndex(e=>e.id===g.empId);
-                    return React.createElement('div',{key:g.id,style:{fontSize:isMobile?9:8,fontWeight:700,color:'#fff',background:eAcc(ei),borderRadius:3,padding:'1px 3px',marginBottom:1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}},
-                      employees.find(e=>e.id===g.empId)?employees.find(e=>e.id===g.empId).name.slice(0,isMobile?4:6):'?');
+                    const dotColor = g.statut==='valide'?eAcc(ei):g.statut==='attente'?'#d97706':'#dc2626';
+                    return React.createElement('div',{key:g.id,style:{fontSize:isMobile?9:8,fontWeight:700,color:'#fff',background:dotColor,borderRadius:3,padding:'1px 3px',marginBottom:1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}},
+                      (employees.find(e=>e.id===g.empId)||{name:'?'}).name.slice(0,isMobile?4:6));
                   }),
                   cgsJ.length>(isMobile?2:3)&&React.createElement('div',{key:'more',style:{fontSize:8,color:'#aaa'}},'+'+( cgsJ.length-(isMobile?2:3)))
                 ]);
               })}
             </div>
-            {isAdmin&&<div style={{marginTop:10,fontSize:11,color:'#aaa',textAlign:'center'}}>{!selS?'Cliquez le 1er jour':!selE?'Cliquez le dernier jour':'Plage: '+frDC(new Date(selS+'T12:00'))+' au '+frDC(new Date(selE+'T12:00'))}</div>}
+            <div style={{marginTop:10,fontSize:11,color:'#aaa',textAlign:'center'}}>
+              {!selS?'Cliquez le 1er jour':!selE?'Cliquez le dernier jour':'Plage: '+frDC(new Date(selS+'T12:00'))+' au '+frDC(new Date(selE+'T12:00'))}
+            </div>
             <div style={{display:'flex',flexWrap:'wrap',gap:5,marginTop:12,paddingTop:10,borderTop:'1px solid #f0f0f0'}}>
               {employees.map(function(emp,ei){
-                const nb=conges.filter(g=>g.empId===emp.id).length;
+                const nb=conges.filter(g=>g.empId===emp.id&&g.statut==='valide').length;
+                const att=conges.filter(g=>g.empId===emp.id&&g.statut==='attente').length;
                 return React.createElement('span',{key:emp.id,style:{background:eAcc(ei)+'22',color:eAcc(ei),border:'1px solid '+eAcc(ei)+'44',borderRadius:6,padding:'3px 8px',fontSize:isMobile?12:10,fontWeight:700}},
-                  emp.name+(nb>0?' ('+nb+')':''));
+                  emp.name+(nb>0?' ('+nb+')':(att>0?' ('+att+' att.)':'')));
               })}
             </div>
           </div>
+
+          {/* ── PANNEAU DROIT ── */}
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
-            {isAdmin&&(
-              <div style={{background:'#fff',borderRadius:14,padding:18,boxShadow:'0 2px 8px rgba(0,0,0,0.05)',border:'1px solid #e5e7eb'}}>
-                <div style={{fontSize:14,fontWeight:800,color:'#1a1a2e',marginBottom:14}}>Ajouter un conge</div>
-                <label style={lb}>Collaborateur</label>
-                <select value={cgEmp} onChange={e=>setCgEmp(e.target.value)} style={{...ip,marginBottom:10}}>
-                  <option value="">-- Choisir --</option>
-                  {employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
-                </select>
-                <label style={lb}>Type</label>
-                <div style={{display:'flex',flexWrap:'wrap',gap:5,marginBottom:10}}>
-                  {TYPES_CG.map(function(t,ti){
-                    const col=CG_COLORS[t]||'#94a3b8';
-                    return React.createElement('button',{key:t,onClick:()=>setCgType(t),style:{padding:'4px 9px',borderRadius:20,border:'1.5px solid '+(cgType===t?col:'#e5e7eb'),background:cgType===t?col+'22':'#fff',color:cgType===t?col:'#555',fontWeight:700,fontSize:11,cursor:'pointer'}},TYPES_CG_DISPLAY[ti]);
-                  })}
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
-                  <div><label style={lb}>Debut</label><input type="date" value={cgDeb} onChange={e=>setCgDeb(e.target.value)} style={ip}/></div>
-                  <div><label style={lb}>Fin</label><input type="date" value={cgFin} min={cgDeb} onChange={e=>setCgFin(e.target.value)} style={ip}/></div>
-                </div>
-                {cgDeb&&cgFin&&<div style={{background:'#f0f8ff',borderRadius:8,padding:'7px 10px',marginBottom:10,fontSize:12,color:'#1a6ed8',border:'1px solid #cce5ff'}}>{jouvres(new Date(cgDeb+'T12:00'),new Date(cgFin+'T12:00'))+' jours ouvres'}</div>}
-                <label style={lb}>Note</label>
-                <input value={cgNote} onChange={e=>setCgNote(e.target.value)} placeholder="Ex: Vacances ete..." style={{...ip,marginBottom:12}}/>
-                <button onClick={addCg} disabled={!cgEmp||!cgDeb||!cgFin} style={{width:'100%',padding:'10px 0',borderRadius:9,border:'none',background:cgEmp&&cgDeb&&cgFin?'#1a6ed8':'#e5e7eb',color:cgEmp&&cgDeb&&cgFin?'#fff':'#aaa',fontWeight:800,fontSize:14,cursor:cgEmp&&cgDeb&&cgFin?'pointer':'default'}}>Enregistrer</button>
-              </div>
-            )}
+
+            {/* Formulaire : admin ajoute directement, lecteur fait une demande */}
             <div style={{background:'#fff',borderRadius:14,padding:18,boxShadow:'0 2px 8px rgba(0,0,0,0.05)',border:'1px solid #e5e7eb'}}>
-              <div style={{fontSize:13,fontWeight:800,color:'#1a1a2e',marginBottom:12}}>Conges enregistres ({conges.length})</div>
-              {conges.length===0?<div style={{color:'#ccc',fontSize:13,textAlign:'center',padding:'14px 0'}}>Aucun conge</div>:
-                [...conges].sort((a,b)=>a.debut.localeCompare(b.debut)).map(function(g){
-                  const emp=employees.find(e=>e.id===g.empId), ei=employees.findIndex(e=>e.id===g.empId);
+              <div style={{fontSize:14,fontWeight:800,color:'#1a1a2e',marginBottom:4}}>
+                {isAdmin?'➕ Ajouter un congé':'📝 Demander un congé'}
+              </div>
+              {!isAdmin&&<div style={{fontSize:11,color:'#d97706',marginBottom:12,background:'#fffbeb',borderRadius:7,padding:'6px 10px',border:'1px solid #fde68a'}}>
+                Votre demande sera soumise à validation par Laetitia
+              </div>}
+
+              {isAdmin&&(
+                <div style={{marginBottom:10}}>
+                  <label style={lb}>Collaborateur</label>
+                  <select value={cgEmp} onChange={e=>setCgEmp(e.target.value)} style={{...ip,marginBottom:0}}>
+                    <option value="">-- Choisir --</option>
+                    {employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+                  </select>
+                </div>
+              )}
+
+              <label style={lb}>Type</label>
+              <div style={{display:'flex',flexWrap:'wrap',gap:5,marginBottom:10}}>
+                {TYPES_CG.map(function(t,ti){
+                  const col=CG_COLORS[t]||'#94a3b8';
+                  return React.createElement('button',{key:t,onClick:()=>setCgType(t),style:{padding:'5px 10px',borderRadius:20,border:'1.5px solid '+(cgType===t?col:'#e5e7eb'),background:cgType===t?col+'22':'#fff',color:cgType===t?col:'#555',fontWeight:700,fontSize:12,cursor:'pointer'}},TYPES_CG_DISPLAY[ti]);
+                })}
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+                <div><label style={lb}>Début</label><input type="date" value={cgDeb} onChange={e=>setCgDeb(e.target.value)} style={ip}/></div>
+                <div><label style={lb}>Fin</label><input type="date" value={cgFin} min={cgDeb} onChange={e=>setCgFin(e.target.value)} style={ip}/></div>
+              </div>
+              {cgDeb&&cgFin&&<div style={{background:'#f0f8ff',borderRadius:8,padding:'7px 10px',marginBottom:10,fontSize:12,color:'#1a6ed8',border:'1px solid #cce5ff'}}>{jouvres(new Date(cgDeb+'T12:00'),new Date(cgFin+'T12:00'))+' jours ouvres'}</div>}
+              <label style={lb}>Note</label>
+              <input value={cgNote} onChange={e=>setCgNote(e.target.value)} placeholder="Ex: Vacances ete..." style={{...ip,marginBottom:12}}/>
+
+              {isAdmin?(
+                <button onClick={addCg} disabled={!cgEmp||!cgDeb||!cgFin}
+                  style={{width:'100%',padding:'10px 0',borderRadius:9,border:'none',background:cgEmp&&cgDeb&&cgFin?'#1a6ed8':'#e5e7eb',color:cgEmp&&cgDeb&&cgFin?'#fff':'#aaa',fontWeight:800,fontSize:14,cursor:cgEmp&&cgDeb&&cgFin?'pointer':'default'}}>
+                  ✅ Ajouter (validé directement)
+                </button>
+              ):(
+                <button onClick={demanderCg} disabled={!cgDeb||!cgFin}
+                  style={{width:'100%',padding:'10px 0',borderRadius:9,border:'none',background:cgDeb&&cgFin?'#d97706':'#e5e7eb',color:cgDeb&&cgFin?'#fff':'#aaa',fontWeight:800,fontSize:14,cursor:cgDeb&&cgFin?'pointer':'default'}}>
+                  📤 Envoyer la demande
+                </button>
+              )}
+            </div>
+
+            {/* Mes demandes (lecteur) */}
+            {!isAdmin&&(
+              <div style={{background:'#fff',borderRadius:14,padding:18,boxShadow:'0 2px 8px rgba(0,0,0,0.05)',border:'1px solid #e5e7eb'}}>
+                <div style={{fontSize:13,fontWeight:800,color:'#1a1a2e',marginBottom:12}}>{'Mes demandes ('+mesDemandes.length+')'}</div>
+                {mesDemandes.length===0?(
+                  <div style={{color:'#ccc',fontSize:13,textAlign:'center',padding:'14px 0'}}>Aucune demande</div>
+                ):[...mesDemandes].sort((a,b)=>b.demandeLe.localeCompare(a.demandeLe)).map(function(g){
                   const col=CG_COLORS[g.type]||'#94a3b8';
                   const j=jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));
-                  return React.createElement('div',{key:g.id,style:{display:'flex',alignItems:'flex-start',gap:8,padding:'8px 10px',background:'#f8f9fa',borderRadius:9,marginBottom:6,borderLeft:'4px solid '+eAcc(ei)}},
-                    React.createElement('div',{style:{flex:1}},
-                      React.createElement('div',{style:{display:'flex',alignItems:'center',gap:5,marginBottom:2,flexWrap:'wrap'}},
-                        React.createElement('span',{style:{fontWeight:700,fontSize:12,color:eAcc(ei)}},'• '+(emp?emp.name:'?')),
-                        React.createElement('span',{style:{background:col+'22',color:col,border:'1px solid '+col+'55',borderRadius:4,padding:'0 5px',fontSize:9,fontWeight:700}},g.type),
-                        React.createElement('span',{style:{fontSize:9,color:'#aaa'}},j+'j')
+                  return React.createElement('div',{key:g.id,style:{padding:'10px 12px',background:statutBg(g.statut),borderRadius:10,marginBottom:8,border:'1px solid '+statutColor(g.statut)+'33',borderLeft:'4px solid '+statutColor(g.statut)}},
+                    React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}},
+                      React.createElement('div',{style:{display:'flex',alignItems:'center',gap:5}},
+                        React.createElement('span',{style:{background:col+'22',color:col,border:'1px solid '+col+'44',borderRadius:4,padding:'1px 6px',fontSize:10,fontWeight:700}},g.type),
+                        React.createElement('span',{style:{fontSize:11,color:'#888'}},j+'j')
                       ),
-                      React.createElement('div',{style:{fontSize:11,color:'#666'}},frDS(g.debut)+' au '+frDS(g.fin)),
-                      g.note&&React.createElement('div',{style:{fontSize:10,color:'#aaa',fontStyle:'italic'}},g.note)
+                      React.createElement('span',{style:{fontSize:11,fontWeight:700,color:statutColor(g.statut)}},statutLabel(g.statut))
                     ),
-                    isAdmin&&React.createElement('button',{onClick:()=>delCg(g.id),style:{background:'none',border:'none',color:'#ef4444',cursor:'pointer',fontSize:14,padding:'2px'}},'X')
+                    React.createElement('div',{style:{fontSize:12,color:'#555'}},frDS(g.debut)+' au '+frDS(g.fin)),
+                    g.note&&React.createElement('div',{style:{fontSize:11,color:'#888',fontStyle:'italic',marginTop:2}},g.note),
+                    (g.statut==='attente'||g.statut==='refuse')&&React.createElement('button',{onClick:()=>delCg(g.id),style:{marginTop:6,padding:'4px 10px',borderRadius:7,border:'1px solid #e5e7eb',background:'#f8f9fa',color:'#888',fontWeight:600,fontSize:11,cursor:'pointer'}},'Annuler')
                   );
-                })
-              }
-            </div>
+                })}
+              </div>
+            )}
+
+            {/* Liste tous les congés (admin) */}
+            {isAdmin&&(
+              <div style={{background:'#fff',borderRadius:14,padding:18,boxShadow:'0 2px 8px rgba(0,0,0,0.05)',border:'1px solid #e5e7eb'}}>
+                <div style={{fontSize:13,fontWeight:800,color:'#1a1a2e',marginBottom:12}}>{'Tous les congés ('+conges.length+')'}</div>
+                {conges.length===0?<div style={{color:'#ccc',fontSize:13,textAlign:'center',padding:'14px 0'}}>Aucun conge</div>:
+                  [...conges].sort((a,b)=>a.debut.localeCompare(b.debut)).map(function(g){
+                    const emp=employees.find(e=>e.id===g.empId), ei=employees.findIndex(e=>e.id===g.empId);
+                    const col=CG_COLORS[g.type]||'#94a3b8';
+                    const j=jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));
+                    return React.createElement('div',{key:g.id,style:{display:'flex',alignItems:'flex-start',gap:8,padding:'8px 10px',background:statutBg(g.statut),borderRadius:9,marginBottom:6,borderLeft:'4px solid '+(g.statut==='valide'?eAcc(ei):statutColor(g.statut))}},
+                      React.createElement('div',{style:{flex:1}},
+                        React.createElement('div',{style:{display:'flex',alignItems:'center',gap:5,marginBottom:2,flexWrap:'wrap'}},
+                          React.createElement('span',{style:{fontWeight:700,fontSize:12,color:eAcc(ei)}},'● '+(emp?emp.name:'?')),
+                          React.createElement('span',{style:{background:col+'22',color:col,border:'1px solid '+col+'44',borderRadius:4,padding:'0 5px',fontSize:9,fontWeight:700}},g.type),
+                          React.createElement('span',{style:{fontSize:9,color:'#aaa'}},j+'j'),
+                          React.createElement('span',{style:{fontSize:9,fontWeight:700,color:statutColor(g.statut)}},statutLabel(g.statut))
+                        ),
+                        React.createElement('div',{style:{fontSize:11,color:'#666'}},frDS(g.debut)+' au '+frDS(g.fin)),
+                        g.note&&React.createElement('div',{style:{fontSize:10,color:'#aaa',fontStyle:'italic'}},g.note)
+                      ),
+                      React.createElement('button',{onClick:()=>delCg(g.id),style:{background:'none',border:'none',color:'#ef4444',cursor:'pointer',fontSize:14,padding:'2px'}},'X')
+                    );
+                  })
+                }
+              </div>
+            )}
+
+            {/* Soldes */}
             <div style={{background:'#fff',borderRadius:14,padding:18,boxShadow:'0 2px 8px rgba(0,0,0,0.05)',border:'1px solid #e5e7eb'}}>
-              <div style={{fontSize:13,fontWeight:800,color:'#1a1a2e',marginBottom:12}}>Soldes par collaborateur</div>
+              <div style={{fontSize:13,fontWeight:800,color:'#1a1a2e',marginBottom:12}}>📊 Soldes validés</div>
               {employees.map(function(emp,ei){
-                const myCgs=conges.filter(g=>g.empId===emp.id);
+                const myCgs=conges.filter(g=>g.empId===emp.id&&g.statut==='valide');
                 const cpJ=myCgs.filter(g=>g.type==='Conge').reduce((s,g)=>s+jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00')),0);
                 const rttJ=myCgs.filter(g=>g.type==='RTT').reduce((s,g)=>s+jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00')),0);
                 const tot=myCgs.reduce((s,g)=>s+jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00')),0);
+                const att=conges.filter(g=>g.empId===emp.id&&g.statut==='attente').length;
                 return React.createElement('div',{key:emp.id,style:{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',borderRadius:8,marginBottom:5,background:'#f8f9fa',borderLeft:'4px solid '+eAcc(ei)}},
                   React.createElement('span',{style:{fontWeight:700,fontSize:12,color:eAcc(ei),minWidth:72}},emp.name),
                   React.createElement('span',{style:{fontSize:11,color:'#059669',fontWeight:700}},cpJ+'j CP'),
                   React.createElement('span',{style:{fontSize:11,color:'#6366f1',fontWeight:700}},rttJ+'j RTT'),
+                  att>0&&React.createElement('span',{style:{fontSize:10,color:'#d97706',fontWeight:700}},att+' att.'),
                   React.createElement('span',{style:{fontSize:11,color:'#555',marginLeft:'auto'}},tot+'j total')
                 );
               })}
@@ -1078,4 +1236,4 @@ function App() {
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
 </script>
 </body>
-</html> 
+</html>
