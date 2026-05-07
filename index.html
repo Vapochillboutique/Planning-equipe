@@ -411,7 +411,8 @@ function App() {
     const sep2 = '------------------------------------------------------------';
     const mLabel = frM(recapY,recapM).toUpperCase();
     let txt = sep1+'\n  COMPTE RENDU MENSUEL - '+mLabel+'\n'+sep1+'\n\n';
-    employees.forEach(emp => {
+    const visibleEmps = isAdmin ? employees : employees.filter(e=>e.name===session.user);
+    visibleEmps.forEach(emp => {
       const s=monthStats(emp.id,recapY,recapM);
       txt += sep2+'\n  '+emp.name.toUpperCase()+'\n'+sep2+'\n';
       txt += '  Jours ouvres      : '+s.jo+'j\n';
@@ -960,10 +961,16 @@ function App() {
     const weeks=getMonthWeeks(recapY,recapM);
     const navR=dir=>{let m=recapM+dir,y=recapY;if(m<0){m=11;y--;}if(m>11){m=0;y++;}setRecapM(m);setRecapY(y);};
     const tdS={padding:'7px 10px',fontSize:12,color:'#444',verticalAlign:'middle'};
+
+    // Admin voit tout, les autres voient uniquement leur propre compte rendu
+    const visibleEmployees = isAdmin
+      ? employees
+      : employees.filter(e=>e.name===session.user);
+
     return (
       <div>
         <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20,flexWrap:'wrap'}}>
-          <h2 style={{fontSize:isMobile?17:20,fontWeight:800,color:'#1a1a2e'}}>📊 Compte rendu mensuel</h2>
+          <h2 style={{fontSize:isMobile?17:20,fontWeight:800,color:'#1a1a2e'}}>📊 {isAdmin?'Compte rendu mensuel':'Mon compte rendu'}</h2>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <button onClick={()=>navR(-1)} style={bs}>&#8249;</button>
             <span style={{fontSize:isMobile?13:15,fontWeight:700,textTransform:'capitalize',minWidth:isMobile?120:150,textAlign:'center'}}>{frM(recapY,recapM)}</span>
@@ -973,7 +980,8 @@ function App() {
             ⬇️ {isMobile?'Export':'Exporter .txt'}
           </button>
         </div>
-        {employees.map(function(emp,ei){
+        {visibleEmployees.map(function(emp,ei){
+          const realEi = employees.findIndex(e=>e.id===emp.id);
           const s=monthStats(emp.id,recapY,recapM);
           const wRows=weeks.map(function(w){
             let wH=0,wHS=0,wHF=0;
@@ -989,9 +997,9 @@ function App() {
             const th=w.wd.length*H_STD, tot=Math.round((wH+wHS+wHF)*10)/10, diff=Math.round((tot-H_SEM)*10)/10;
             return {mon:w.mon,wd:w.wd,wH,wHS,wHF,th,tot,diff};
           });
-          return React.createElement('div',{key:emp.id,style:{background:'#fff',borderRadius:12,padding:18,marginBottom:14,boxShadow:'0 2px 8px rgba(0,0,0,0.05)',border:'1px solid #e5e7eb',borderLeft:'5px solid '+eAcc(ei)}},
+          return React.createElement('div',{key:emp.id,style:{background:'#fff',borderRadius:12,padding:18,marginBottom:14,boxShadow:'0 2px 8px rgba(0,0,0,0.05)',border:'1px solid #e5e7eb',borderLeft:'5px solid '+eAcc(realEi)}},
             React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,marginBottom:14}},
-              React.createElement('span',{style:{color:eAcc(ei),fontSize:15}},'\u25cf'),
+              React.createElement('span',{style:{color:eAcc(realEi),fontSize:15}},'\u25cf'),
               React.createElement('span',{style:{fontSize:15,fontWeight:800}},emp.name),
               React.createElement('span',{style:{fontSize:11,color:'#aaa'}},s.jo+' jours ouvres - '+s.hTheo+'h theoriques')
             ),
@@ -1056,7 +1064,7 @@ function App() {
             )
           );
         })}
-        <div style={{background:'#1a1a2e',borderRadius:12,padding:18,border:'1px solid #333'}}>
+        {isAdmin&&<div style={{background:'#1a1a2e',borderRadius:12,padding:18,border:'1px solid #333'}}>
           <div style={{fontSize:14,fontWeight:800,color:'#fff',marginBottom:12}}>{'Synthese equipe - '+frM(recapY,recapM)}</div>
           <table style={{borderCollapse:'collapse',width:'100%'}}>
             <thead>
@@ -1081,7 +1089,7 @@ function App() {
               })}
             </tbody>
           </table>
-        </div>
+        </div>}
       </div>
     );
   };
