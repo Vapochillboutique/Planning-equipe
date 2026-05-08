@@ -85,9 +85,15 @@ const getWD = mon => Array.from({length:7},(_,i)=>addD(mon,i));
 const parseH = (val, jourNum) => {
   if(!val) return 0;
   const up = val.trim().toUpperCase();
-  const isAbs = ["OFF","CONGE","CONGÉ","RTT","MALADIE","ABSENCE","OFF/FERIE","OFF/FÉRIÉ"].some(x => up===x || up.startsWith(x+' '));
+
+  // OFF/Férié = 7h payées mais non travaillées
+  if(up==="OFF/FERIE" || up==="OFF/FÉRIÉ") return H_STD;
+
+  // Absences non payées = 0h
+  const isAbs = ["OFF","CONGE","CONGÉ","RTT","MALADIE","ABSENCE"].some(x => up===x || up.startsWith(x+' '));
   const isFT = up.includes("FERIE TRAVAILLE") || up.includes("FERIE TRAVAILLÉ") || up.includes("FÉRIÉ TRAVAILLÉ");
   if(isAbs && !isFT) return 0;
+
   const m = val.match(/(\d{1,2})[hH](\d{2})\s*[\/\-]\s*(\d{1,2})[hH](\d{2})/i);
   if(!m) return 0;
   const a = parseInt(m[1])*60+parseInt(m[2]);
@@ -411,12 +417,13 @@ function App() {
         const h=parseH(cv.val,d.getDay());
         if(up.includes("FERIE TRAVAIL")){
           ftJ++; hFB+=h; hFM+=Math.round(h*1.25*10)/10;
+        } else if(up==="OFF/FERIE"||up==="OFF/FÉRIÉ") {
+          fJ++; hT+=H_STD; // Férié payé = 7h comptées
         } else {
           hT+=h; if(cv.hsupp)hS+=Number(cv.hsupp);
           if(up.includes("CONGE")||up.includes("CONGÉ"))cpJ++;
           else if(up==="RTT")rttJ++;
           else if(up==="MALADIE")malJ++;
-          else if(up.includes("FERIE")||up.includes("FÉRIÉ"))fJ++;
         }
       }
       d.setDate(d.getDate()+1);
@@ -527,7 +534,8 @@ function App() {
                               {cv&&cv.val?(
                                 <div style={{padding:'4px 5px',borderRadius:7,background:bg}}>
                                   <div style={{fontWeight:700,fontSize:10,color:tc,lineHeight:1.3,wordBreak:'break-word'}}>{cv.val}</div>
-                                  {h>0&&<div style={{fontSize:9,color:'#888'}}>{h}h</div>}
+                                  {(cv.val.toUpperCase()==='OFF/FERIE'||cv.val.toUpperCase()==='OFF/FÉRIÉ')&&<div style={{fontSize:8,color:'#b45309'}}>7h payées</div>}
+                                  {h>0&&cv.val.toUpperCase()!=='OFF/FERIE'&&cv.val.toUpperCase()!=='OFF/FÉRIÉ'&&<div style={{fontSize:9,color:'#888'}}>{h}h</div>}
                                   {cv.hsupp>0&&<div style={{fontSize:9,color:'#f59e0b',fontWeight:700}}>+{cv.hsupp}h</div>}
                                   {isFT&&<div style={{fontSize:9,color:'#c2410c',fontWeight:700}}>+25%</div>}
                                   {cv.fromCg&&<div style={{fontSize:8,color:'#888',fontStyle:'italic'}}>conge</div>}
@@ -641,7 +649,8 @@ function App() {
                           {cv&&cv.val?(
                             <div style={{padding:'6px 8px',borderRadius:8,background:bg}}>
                               <div style={{fontWeight:700,fontSize:13,color:tc,whiteSpace:'nowrap'}}>{cv.val}</div>
-                              {h>0&&<div style={{fontSize:10,color:'#aaa',marginTop:1}}>{h}h</div>}
+                              {(cv.val.toUpperCase()==='OFF/FERIE'||cv.val.toUpperCase()==='OFF/FÉRIÉ')&&<div style={{fontSize:10,color:'#b45309',marginTop:1}}>7h payées</div>}
+                              {h>0&&cv.val.toUpperCase()!=='OFF/FERIE'&&cv.val.toUpperCase()!=='OFF/FÉRIÉ'&&<div style={{fontSize:10,color:'#aaa',marginTop:1}}>{h}h</div>}
                               {cv.hsupp>0&&<div style={{fontSize:10,color:'#f59e0b',fontWeight:700}}>+{cv.hsupp}h supp</div>}
                               {isFT&&<div style={{fontSize:10,color:'#c2410c',fontWeight:700}}>x1.25 = {Math.round(h*1.25*10)/10}h</div>}
                               {cv.fromCg&&<div style={{fontSize:9,color:'#888',fontStyle:'italic'}}>conge pose</div>}
