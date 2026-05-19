@@ -292,6 +292,14 @@ function App() {
   // Employé pose une DEMANDE (statut: 'attente')
   const demanderCg = async () => {
     if(!cgDeb||!cgFin||!fbReady) return;
+    // Vérifier que la date de début est au moins 1 mois à l'avance
+    const debut = new Date(cgDeb+'T12:00');
+    const minDate = new Date();
+    minDate.setMonth(minDate.getMonth()+1);
+    if(debut < minDate){
+      alert('Les congés doivent être demandés au moins 1 mois à l\'avance. Date minimum : '+minDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}));
+      return;
+    }
     const {db,doc,setDoc}=window.__fb;
     const empId = employees.find(e=>e.name===session.user)?.id;
     if(!empId) return;
@@ -868,8 +876,8 @@ function App() {
               <div style={{fontSize:14,fontWeight:800,color:'#1a1a2e',marginBottom:4}}>
                 {isAdmin?'➕ Ajouter un congé':'📝 Demander un congé'}
               </div>
-              {!isAdmin&&<div style={{fontSize:11,color:'#d97706',marginBottom:12,background:'#fffbeb',borderRadius:7,padding:'6px 10px',border:'1px solid #fde68a'}}>
-                Votre demande sera soumise à validation par Laetitia
+              {!isAdmin&&<div style={{fontSize:11,color:'#d97706',marginBottom:12,background:'#fffbeb',borderRadius:7,padding:'8px 10px',border:'1px solid #fde68a'}}>
+                ⚠️ Les congés doivent être demandés <strong>au moins 1 mois à l'avance</strong>. Toute demande en dessous de ce délai sera automatiquement refusée.
               </div>}
 
               {isAdmin&&(
@@ -890,8 +898,10 @@ function App() {
                 })}
               </div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
-                <div><label style={lb}>Début</label><input type="date" value={cgDeb} onChange={e=>setCgDeb(e.target.value)} style={ip}/></div>
-                <div><label style={lb}>Fin</label><input type="date" value={cgFin} min={cgDeb} onChange={e=>setCgFin(e.target.value)} style={ip}/></div>
+                <div><label style={lb}>Début</label><input type="date" value={cgDeb}
+                  min={!isAdmin?(()=>{const d=new Date();d.setMonth(d.getMonth()+1);return d.toISOString().split('T')[0];})():''}
+                  onChange={e=>setCgDeb(e.target.value)} style={ip}/></div>
+                <div><label style={lb}>Fin</label><input type="date" value={cgFin} min={cgDeb||(!isAdmin?(()=>{const d=new Date();d.setMonth(d.getMonth()+1);return d.toISOString().split('T')[0];})():'')} onChange={e=>setCgFin(e.target.value)} style={ip}/></div>
               </div>
               {cgDeb&&cgFin&&<div style={{background:'#f0f8ff',borderRadius:8,padding:'7px 10px',marginBottom:10,fontSize:12,color:'#1a6ed8',border:'1px solid #cce5ff'}}>{jouvres(new Date(cgDeb+'T12:00'),new Date(cgFin+'T12:00'))+' jours ouvres'}</div>}
               <label style={lb}>Note</label>
