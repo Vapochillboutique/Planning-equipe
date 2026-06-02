@@ -121,14 +121,14 @@ const FIXED_SCHEDULES = {
 
 // Creneaux horaires 10h00 -> 19h30 par 15min
 const SLOTS = [];
-for(var h=10;h<=19;h++){var mx=h===19?30:45;for(var m=0;m<=mx;m+=15)SLOTS.push(String(h).padStart(2,'0')+'h'+(m===0?'00':String(m)));}
+for(let h =10;h<=19;h++){let mx =h===19?30:45;for(let m =0;m<=mx;m+=15)SLOTS.push(String(h).padStart(2,'0')+'h'+(m===0?'00':String(m)));}
 
 // ── Utilitaires ───────────────────────────────────────────────────────────────
 const pad   = n => String(n).padStart(2,'0');
 const dk    = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const isWE  = d => d.getDay()===0;
-const addD  = (d,n) => { var r=new Date(d); r.setDate(r.getDate()+n); return r; };
-const getMon = d => { var r=new Date(d); var day=r.getDay(); r.setDate(r.getDate()+(day===0?-6:1-day)); r.setHours(0,0,0,0); return r; };
+const addD  = (d,n) => { let r =new Date(d); r.setDate(r.getDate()+n); return r; };
+const getMon = d => { let r =new Date(d); let day =r.getDay(); r.setDate(r.getDate()+(day===0?-6:1-day)); r.setHours(0,0,0,0); return r; };
 const frD   = d => d.toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
 const frDC  = d => d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
 const frDS  = s => new Date(s+'T12:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
@@ -137,21 +137,21 @@ const getWD = mon => Array.from({length:7},function(_,i){return addD(mon,i);});
 
 const parseH = function(val, jourNum) {
   if(!val) return 0;
-  var up = val.trim().toUpperCase();
+  let up = val.trim().toUpperCase();
   if(up==="OFF/FERIE"||up==="OFF/FÉRIÉ") return H_STD;
-  var isAbs = ["OFF","CONGE","RTT","MALADIE","ABSENCE"].some(function(x){return up===x||up.startsWith(x+' ');});
-  var isFT  = up.includes("FERIE TRAVAIL");
+  let isAbs = ["OFF","CONGE","RTT","MALADIE","ABSENCE"].some(function(x){return up===x||up.startsWith(x+' ');});
+  let isFT = up.includes("FERIE TRAVAIL");
   if(isAbs && !isFT) return 0;
-  var mt = val.match(/(\d{1,2})[hH](\d{2})\s*[\/\-]\s*(\d{1,2})[hH](\d{2})/i);
+  let mt = val.match(/(\d{1,2})[hH](\d{2})\s*[\/\-]\s*(\d{1,2})[hH](\d{2})/i);
   if(!mt) return 0;
-  var a = parseInt(mt[1])*60+parseInt(mt[2]);
-  var b = parseInt(mt[3])*60+parseInt(mt[4]);
-  var diff = b-a;
+  let a = parseInt(mt[1])*60+parseInt(mt[2]);
+  let b = parseInt(mt[3])*60+parseInt(mt[4]);
+  let diff = b-a;
   if(diff<=0) return 0;
-  var isCh   = up.includes("CHATEAU");
-  var isBlere = up.includes("BLERE");
-  var isSam  = jourNum===6;
-  var pause  = 0;
+  let isCh = up.includes("CHATEAU");
+  let isBlere = up.includes("BLERE");
+  let isSam = jourNum===6;
+  let pause = 0;
   if(diff > 360) {
     if(isCh)     pause = isSam ? 60 : 90; // Château : 1h sam, 1h30 lun-ven
     else         pause = 60;              // Standard + Bléré : 1h
@@ -162,7 +162,7 @@ const parseH = function(val, jourNum) {
 
 const cellBg = function(val, ei) {
   if(!val) return '#fff';
-  var up = val.trim().toUpperCase();
+  let up = val.trim().toUpperCase();
   if(up==="OFF") return '#f8f8f8';
   if(up.includes("FERIE TRAVAIL")) return '#fff0e0';
   if(up.includes("FERIE")) return '#fff8e1';
@@ -179,7 +179,7 @@ const cellBg = function(val, ei) {
 
 const cellTxt = function(val) {
   if(!val) return '#ccc';
-  var up = val.trim().toUpperCase();
+  let up = val.trim().toUpperCase();
   if(up==="OFF") return '#aaa';
   if(up.includes("FERIE TRAVAIL")) return '#c2410c';
   if(up.includes("FERIE")) return '#b45309';
@@ -195,15 +195,15 @@ const cellTxt = function(val) {
 };
 
 const jouvres = function(d1, d2) {
-  var d=new Date(d1), n=0;
+  let d =new Date(d1), n=0;
   while(d<=d2){ if(d.getDay()!==0) n++; d.setDate(d.getDate()+1); }
   return n;
 };
 
 const getMonthWeeks = function(y,m) {
-  var weeks=[], last=new Date(y,m+1,0), mon=getMon(new Date(y,m,1));
+  let weeks =[], last=new Date(y,m+1,0), mon=getMon(new Date(y,m,1));
   while(mon<=last){
-    var wd=getWD(mon).filter(function(d){return d.getMonth()===m&&!isWE(d);});
+    let wd =getWD(mon).filter(function(d){return d.getMonth()===m&&!isWE(d);});
     if(wd.length) weeks.push({mon:new Date(mon),wd:wd});
     mon=addD(mon,7);
   }
@@ -213,19 +213,19 @@ const getMonthWeeks = function(y,m) {
 // Session
 const SK = "planSess3";
 const saveS = function(s){try{localStorage.setItem(SK,JSON.stringify(s));}catch(e){}};
-const loadS = function(){try{var v=localStorage.getItem(SK);if(v)return JSON.parse(v);}catch(e){} return null;};
+const loadS = function(){try{let v =localStorage.getItem(SK);if(v)return JSON.parse(v);}catch(e){} return null;};
 const clearS = function(){try{localStorage.removeItem(SK);}catch(e){}};
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 function Login(props) {
-  var onLogin = props.onLogin;
-  var u = React.useState(''); var setU = u[1]; u = u[0];
-  var p = React.useState(''); var setP = p[1]; p = p[0];
-  var err = React.useState(''); var setErr = err[1]; err = err[0];
-  var show = React.useState(false); var setShow = show[1]; show = show[0];
+  let onLogin = props.onLogin;
+  let u = React.useState(''); let setU = u[1]; u = u[0];
+  let p = React.useState(''); let setP = p[1]; p = p[0];
+  let err = React.useState(''); let setErr = err[1]; err = err[0];
+  let show = React.useState(false); let setShow = show[1]; show = show[0];
 
-  var go = function() {
-    var found = USERS.find(function(x){return x.user.toLowerCase()===u.trim().toLowerCase()&&x.pass===p.trim();});
+  let go = function() {
+    let found = USERS.find(function(x){return x.user.toLowerCase()===u.trim().toLowerCase()&&x.pass===p.trim();});
     if(found){ saveS({user:found.user,role:found.role}); onLogin({user:found.user,role:found.role}); }
     else{ setErr('Identifiant ou mot de passe incorrect.'); setTimeout(function(){setErr('');},3000); }
   };
@@ -261,78 +261,78 @@ function Login(props) {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 function App() {
-  var today = new Date();
+  let today = new Date();
 
-  var _s   = React.useState(null);    var session=_s[0],   setSession=_s[1];
-  var _so  = React.useState(false);   var sesOk=_so[0],    setSesOk=_so[1];
-  var _fb  = React.useState(false);   var fbReady=_fb[0],  setFbReady=_fb[1];
-  var _sy  = React.useState('Connexion...'); var sync=_sy[0], setSync=_sy[1];
-  var _em  = React.useState(DEFAULT_EMP); var employees=_em[0], setEmployees=_em[1];
-  var _ce  = React.useState({});      var cells=_ce[0],    setCells=_ce[1];
-  var _cg  = React.useState([]);      var conges=_cg[0],   setConges=_cg[1];
-  var _vi  = React.useState('planning'); var view=_vi[0],  setView=_vi[1];
-  var _mo  = React.useState(getMon(today)); var monday=_mo[0], setMonday=_mo[1];
-  var _cgm = React.useState(today.getMonth());  var cgMonth=_cgm[0],  setCgMonth=_cgm[1];
-  var _cgy = React.useState(today.getFullYear()); var cgYear=_cgy[0], setCgYear=_cgy[1];
-  var _rm  = React.useState(today.getMonth());  var recapM=_rm[0],  setRecapM=_rm[1];
-  var _ry  = React.useState(today.getFullYear()); var recapY=_ry[0], setRecapY=_ry[1];
-  var _md  = React.useState(null);    var modal=_md[0],    setModal=_md[1];
-  var _ml  = React.useState('');      var mLieu=_ml[0],    setMLieu=_ml[1];
-  var _ma  = React.useState('');      var mAbs=_ma[0],     setMAbs=_ma[1];
-  var _mdb = React.useState('');      var mDeb=_mdb[0],    setMDeb=_mdb[1];
-  var _mf  = React.useState('');      var mFin=_mf[0],     setMFin=_mf[1];
-  var _mhs = React.useState(0);       var mHS=_mhs[0],     setMHS=_mhs[1];
-  var _mfe = React.useState(false);   var mFerie=_mfe[0],  setMFerie=_mfe[1];
-  var _cge = React.useState('');      var cgEmp=_cge[0],   setCgEmp=_cge[1];
-  var _cgt = React.useState('Conge'); var cgType=_cgt[0],  setCgType=_cgt[1];
-  var _cgd = React.useState('');      var cgDeb=_cgd[0],   setCgDeb=_cgd[1];
-  var _cgf = React.useState('');      var cgFin=_cgf[0],   setCgFin=_cgf[1];
-  var _cgn = React.useState('');      var cgNote=_cgn[0],  setCgNote=_cgn[1];
-  var _ss  = React.useState(null);    var selS=_ss[0],     setSelS=_ss[1];
-  var _se  = React.useState(null);    var selE=_se[0],     setSelE=_se[1];
-  var _hd  = React.useState(null);    var hovD=_hd[0],     setHovD=_hd[1];
-  var _nn  = React.useState('');      var newName=_nn[0],  setNewName=_nn[1];
-  var _im  = React.useState(window.innerWidth<=640); var isMobile=_im[0], setIsMobile=_im[1];
+  let _s = React.useState(null);    let session =_s[0],   setSession=_s[1];
+  let _so = React.useState(false);   let sesOk =_so[0],    setSesOk=_so[1];
+  let _fb = React.useState(false);   let fbReady =_fb[0],  setFbReady=_fb[1];
+  let _sy = React.useState('Connexion...'); let sync =_sy[0], setSync=_sy[1];
+  let _em = React.useState(DEFAULT_EMP); let employees =_em[0], setEmployees=_em[1];
+  let _ce = React.useState({});      let cells =_ce[0],    setCells=_ce[1];
+  let _cg = React.useState([]);      let conges =_cg[0],   setConges=_cg[1];
+  let _vi = React.useState('planning'); let view =_vi[0],  setView=_vi[1];
+  let _mo = React.useState(getMon(today)); let monday =_mo[0], setMonday=_mo[1];
+  let _cgm = React.useState(today.getMonth());  let cgMonth =_cgm[0],  setCgMonth=_cgm[1];
+  let _cgy = React.useState(today.getFullYear()); let cgYear =_cgy[0], setCgYear=_cgy[1];
+  let _rm = React.useState(today.getMonth());  let recapM =_rm[0],  setRecapM=_rm[1];
+  let _ry = React.useState(today.getFullYear()); let recapY =_ry[0], setRecapY=_ry[1];
+  let _md = React.useState(null);    let modal =_md[0],    setModal=_md[1];
+  let _ml = React.useState('');      let mLieu =_ml[0],    setMLieu=_ml[1];
+  let _ma = React.useState('');      let mAbs =_ma[0],     setMAbs=_ma[1];
+  let _mdb = React.useState('');      let mDeb =_mdb[0],    setMDeb=_mdb[1];
+  let _mf = React.useState('');      let mFin =_mf[0],     setMFin=_mf[1];
+  let _mhs = React.useState(0);       let mHS =_mhs[0],     setMHS=_mhs[1];
+  let _mfe = React.useState(false);   let mFerie =_mfe[0],  setMFerie=_mfe[1];
+  let _cge = React.useState('');      let cgEmp =_cge[0],   setCgEmp=_cge[1];
+  let _cgt = React.useState('Conge'); let cgType =_cgt[0],  setCgType=_cgt[1];
+  let _cgd = React.useState('');      let cgDeb =_cgd[0],   setCgDeb=_cgd[1];
+  let _cgf = React.useState('');      let cgFin =_cgf[0],   setCgFin=_cgf[1];
+  let _cgn = React.useState('');      let cgNote =_cgn[0],  setCgNote=_cgn[1];
+  let _ss = React.useState(null);    let selS =_ss[0],     setSelS=_ss[1];
+  let _se = React.useState(null);    let selE =_se[0],     setSelE=_se[1];
+  let _hd = React.useState(null);    let hovD =_hd[0],     setHovD=_hd[1];
+  let _nn = React.useState('');      let newName =_nn[0],  setNewName=_nn[1];
+  let _im = React.useState(window.innerWidth<=640); let isMobile =_im[0], setIsMobile=_im[1];
 
-  var isAdmin = session && session.role==='admin';
+  let isAdmin = session && session.role==='admin';
 
   React.useEffect(function(){
-    var s=loadS(); if(s)setSession(s); setSesOk(true);
+    let s =loadS(); if(s)setSession(s); setSesOk(true);
   },[]);
 
   React.useEffect(function(){
-    var h=function(){setIsMobile(window.innerWidth<=640);};
+    let h =function(){setIsMobile(window.innerWidth<=640);};
     window.addEventListener('resize',h);
     return function(){window.removeEventListener('resize',h);};
   },[]);
 
   React.useEffect(function(){
     if(window.__fbReady){setFbReady(true);return;}
-    var h=function(){setFbReady(true);};
+    let h =function(){setFbReady(true);};
     window.addEventListener('fbReady',h);
     return function(){window.removeEventListener('fbReady',h);};
   },[]);
 
   React.useEffect(function(){
     if(!fbReady||!session) return;
-    var fb=window.__fb, db=fb.db;
-    var u1=fb.onSnapshot(fb.doc(db,'planning','cells'),function(snap){
+    let fb =window.__fb, db=fb.db;
+    let u1 =fb.onSnapshot(fb.doc(db,'planning','cells'),function(snap){
       if(snap.exists()) setCells(snap.data().data||{});
       setSync('Synchronise');
     },function(){setSync('Erreur sync');});
-    var u2=fb.onSnapshot(fb.collection(db,'conges'),function(snap){
+    let u2 =fb.onSnapshot(fb.collection(db,'conges'),function(snap){
       try{
-        var list=snap.docs.map(function(d){
-          var data=d.data();
+        let list =snap.docs.map(function(d){
+          let data =d.data();
           return {id:d.id,empId:data.empId||'',type:data.type||'Conge',debut:data.debut||'',fin:data.fin||'',note:data.note||'',statut:data.statut||'valide',demandeLe:data.demandeLe||''};
         }).filter(function(g){return g.debut&&g.fin&&g.empId;});
         setConges(list);
       }catch(e){console.error(e);}
     });
-    var u3=fb.onSnapshot(fb.doc(db,'planning','employees'),function(snap){
+    let u3 =fb.onSnapshot(fb.doc(db,'planning','employees'),function(snap){
       if(snap.exists()&&snap.data().list&&snap.data().list.length>0){
-        var list=snap.data().list.map(function(e){
-          var def=DEFAULT_EMP.find(function(d){return d.name===e.name||d.id===e.id;});
+        let list =snap.data().list.map(function(e){
+          let def =DEFAULT_EMP.find(function(d){return d.name===e.name||d.id===e.id;});
           return Object.assign({},e,{hSem:e.hSem||(def&&def.hSem)||35});
         });
         setEmployees(list);
@@ -341,69 +341,69 @@ function App() {
     return function(){u1();u2();u3();};
   },[fbReady,session]);
 
-  var saveC = async function(nc){
+  let saveC = async function(nc){
     if(!fbReady) return;
-    var fb=window.__fb;
+    let fb =window.__fb;
     setSync('Sauvegarde...');
     try{await fb.setDoc(fb.doc(fb.db,'planning','cells'),{data:nc});setSync('Synchronise');}
     catch(e){setSync('Erreur');}
   };
 
-  var saveE = async function(list){
+  let saveE = async function(list){
     if(!fbReady) return;
-    var fb=window.__fb;
+    let fb =window.__fb;
     try{await fb.setDoc(fb.doc(fb.db,'planning','employees'),{list:list});}catch(e){}
   };
 
-  var getHSem = function(empId){
-    var emp=employees.find(function(e){return e.id===empId;});
+  let getHSem = function(empId){
+    let emp =employees.find(function(e){return e.id===empId;});
     return (emp&&emp.hSem)||H_SEM;
   };
 
-  var getCellVal = function(empId, dStr){
-    var c=(cells[empId]||{})[dStr];
+  let getCellVal = function(empId, dStr){
+    let c =(cells[empId]||{})[dStr];
     if(c&&c.val) return c;
-    var cg=conges.find(function(g){return dStr>=g.debut&&dStr<=g.fin&&g.empId===empId&&g.statut==='valide';});
+    let cg =conges.find(function(g){return dStr>=g.debut&&dStr<=g.fin&&g.empId===empId&&g.statut==='valide';});
     if(cg) return {val:cg.type,hsupp:0,fromCg:true};
     // Horaires fixes auto pour Mathieu et Corentin
-    var emp=employees.find(function(e){return e.id===empId;});
+    let emp =employees.find(function(e){return e.id===empId;});
     if(emp){
-      var d=new Date(dStr+'T12:00');
-      var jourNum=d.getDay();
+      let d =new Date(dStr+'T12:00');
+      let jourNum =d.getDay();
       if(emp.name==='Mathieu'){
-        var val=HORAIRES_MATHIEU[jourNum];
+        let val =HORAIRES_MATHIEU[jourNum];
         if(val&&val!=='OFF') return {val:val,hsupp:0,fixed:true};
       }
       if(emp.name==='Corentin'){
-        var val2=HORAIRES_CORENTIN[jourNum];
+        let val2 =HORAIRES_CORENTIN[jourNum];
         if(val2&&val2!=='OFF') return {val:val2,hsupp:0,fixed:true};
       }
     }
     return null;
   };
 
-  var weekStats = function(empId, wDays){
-    var hSem=getHSem(empId), h=0, hs=0, hf=0;
+  let weekStats = function(empId, wDays){
+    let hSem =getHSem(empId), h=0, hs=0, hf=0;
     wDays.forEach(function(d){
-      var cv=getCellVal(empId,dk(d));
+      let cv =getCellVal(empId,dk(d));
       if(!cv) return;
-      var up=(cv.val||'').toUpperCase();
-      var heures=parseH(cv.val,d.getDay());
+      let up =(cv.val||'').toUpperCase();
+      let heures =parseH(cv.val,d.getDay());
       if(up.includes("FERIE TRAVAIL")) hf+=Math.round(heures*1.25*10)/10;
       else if(up!=="OFF"){ h+=heures; if(cv.hsupp)hs+=Number(cv.hsupp); }
     });
-    var tot=Math.round((h+hs+hf)*10)/10;
+    let tot =Math.round((h+hs+hf)*10)/10;
     return {h:Math.round(h*10)/10,hs:hs,hf:hf,tot:tot,hSem:hSem,diff:Math.round((tot-hSem)*10)/10};
   };
 
-  var monthStats = function(empId, y, m){
-    var hSem=getHSem(empId), hJour=Math.round(hSem/5*10)/10;
-    var d=new Date(y,m,1), hT=0,hS=0,hFB=0,hFM=0,cpJ=0,rttJ=0,malJ=0,fJ=0,ftJ=0,jo=0;
+  let monthStats = function(empId, y, m){
+    let hSem =getHSem(empId), hJour=Math.round(hSem/5*10)/10;
+    let d =new Date(y,m,1), hT=0,hS=0,hFB=0,hFM=0,cpJ=0,rttJ=0,malJ=0,fJ=0,ftJ=0,jo=0;
     while(d.getMonth()===m){
       if(!isWE(d)) jo++;
-      var k=dk(d), cv=getCellVal(empId,k);
+      let k =dk(d), cv=getCellVal(empId,k);
       if(cv){
-        var up=(cv.val||'').toUpperCase(), h=parseH(cv.val,d.getDay());
+        let up =(cv.val||'').toUpperCase(), h=parseH(cv.val,d.getDay());
         if(up.includes("FERIE TRAVAIL")){ftJ++;hFB+=h;hFM+=Math.round(h*1.25*10)/10;}
         else if(up==="OFF/FERIE"){fJ++;hT+=hJour;}
         else if(up!=="OFF"){
@@ -416,50 +416,50 @@ function App() {
       d.setDate(d.getDate()+1);
     }
     hT=Math.round(hT*10)/10; hFB=Math.round(hFB*10)/10; hFM=Math.round(hFM*10)/10;
-    var nbSem=Math.round((jo/6)*10)/10;
-    var hTheo=Math.round(nbSem*hSem*10)/10;
-    var hTot=Math.round((hT+hS+hFM)*10)/10;
-    var ecart=Math.round((hTot-hTheo)*10)/10;
+    let nbSem =Math.round((jo/6)*10)/10;
+    let hTheo =Math.round(nbSem*hSem*10)/10;
+    let hTot =Math.round((hT+hS+hFM)*10)/10;
+    let ecart =Math.round((hTot-hTheo)*10)/10;
     return {hT:hT,hS:hS,hFB:hFB,hFM:hFM,hTheo:hTheo,hTot:hTot,ecart:ecart,cpJ:cpJ,rttJ:rttJ,malJ:malJ,fJ:fJ,ftJ:ftJ,jo:jo,hSem:hSem};
   };
 
-  var openModal = function(empId, date, dayIdx){
-    var k=dk(date), c=(cells[empId]||{})[k]||{}, val=c.val||'';
-    var up=val.toUpperCase();
-    var isFT=up.includes("FERIE TRAVAIL");
+  let openModal = function(empId, date, dayIdx){
+    let k =dk(date), c=(cells[empId]||{})[k]||{}, val=c.val||'';
+    let up =val.toUpperCase();
+    let isFT =up.includes("FERIE TRAVAIL");
     setMFerie(isFT);
     if(isFT){setMAbs('');setMLieu('');}
     else{
-      var ai=ABSENCES.findIndex(function(a){return up.startsWith(a.toUpperCase());});
+      let ai =ABSENCES.findIndex(function(a){return up.startsWith(a.toUpperCase());});
       setMAbs(ai>=0?ABSENCES[ai]:'');
-      var li=LIEUX.findIndex(function(l){return up.startsWith(l.toUpperCase());});
+      let li =LIEUX.findIndex(function(l){return up.startsWith(l.toUpperCase());});
       setMLieu(li>=0?LIEUX[li]:'');
     }
-    var mt=val.match(/(\d{1,2})[hH](\d{2})\s*[\/\-]\s*(\d{1,2})[hH](\d{2})/i);
+    let mt =val.match(/(\d{1,2})[hH](\d{2})\s*[\/\-]\s*(\d{1,2})[hH](\d{2})/i);
     setMDeb(mt?mt[1]+'h'+mt[2]:'');
     setMFin(mt?mt[3]+'h'+mt[4]:'');
     setMHS(c.hsupp||0);
     setModal({empId:empId,date:date,k:k,dayIdx:dayIdx});
   };
 
-  var saveModal = async function(){
+  let saveModal = async function(){
     if(!modal) return;
-    var empId=modal.empId, k=modal.k, val='';
+    let empId =modal.empId, k=modal.k, val='';
     if(mFerie&&mDeb&&mFin) val='Ferie travaille '+mDeb+'/'+mFin;
     else if(mAbs) val=mAbs;
     else if(mDeb&&mFin) val=mLieu?(mLieu+' '+mDeb+'/'+mFin):(mDeb+'/'+mFin);
     else if(mLieu) val=mLieu;
-    var nc=Object.assign({},cells);
+    let nc =Object.assign({},cells);
     nc[empId]=Object.assign({},nc[empId]||{});
     if(val||Number(mHS)>0) nc[empId][k]={val:val,hsupp:Number(mHS)||0};
     else delete nc[empId][k];
     setCells(nc); await saveC(nc); setModal(null);
   };
 
-  var clearModal = async function(){
+  let clearModal = async function(){
     if(!modal) return;
-    var empId=modal.empId, k=modal.k;
-    var nc=Object.assign({},cells);
+    let empId =modal.empId, k=modal.k;
+    let nc =Object.assign({},cells);
     nc[empId]=Object.assign({},nc[empId]||{});
     delete nc[empId][k];
     setCells(nc); await saveC(nc);
@@ -467,61 +467,61 @@ function App() {
   };
 
   // Demande conge
-  var demanderCg = async function(){
+  let demanderCg = async function(){
     if(!cgDeb||!cgFin||!fbReady) return;
-    var debut=new Date(cgDeb+'T12:00'), minDate=new Date();
+    let debut =new Date(cgDeb+'T12:00'), minDate=new Date();
     minDate.setMonth(minDate.getMonth()+1);
     if(debut<minDate){alert('Les conges doivent etre demandes au moins 1 mois a l avance.');return;}
-    var fb=window.__fb;
-    var empId=employees.find(function(e){return e.name===session.user;});
+    let fb =window.__fb;
+    let empId =employees.find(function(e){return e.name===session.user;});
     empId=empId?empId.id:null;
     if(!empId) return;
-    var id='cg'+Date.now();
+    let id ='cg'+Date.now();
     await fb.setDoc(fb.doc(fb.db,'conges',id),{empId:empId,type:cgType,debut:cgDeb,fin:cgFin,note:cgNote,statut:'attente',demandeLe:new Date().toISOString()});
     setCgDeb('');setCgFin('');setCgNote('');setSelS(null);setSelE(null);
   };
 
-  var addCg = async function(){
+  let addCg = async function(){
     if(!cgEmp||!cgDeb||!cgFin||!fbReady) return;
-    var fb=window.__fb, id='cg'+Date.now();
+    let fb =window.__fb, id='cg'+Date.now();
     await fb.setDoc(fb.doc(fb.db,'conges',id),{empId:cgEmp,type:cgType,debut:cgDeb,fin:cgFin,note:cgNote,statut:'valide',demandeLe:new Date().toISOString()});
     setCgDeb('');setCgFin('');setCgNote('');setSelS(null);setSelE(null);
   };
 
-  var validerCg = async function(id){
+  let validerCg = async function(id){
     if(!fbReady) return;
-    var fb=window.__fb;
-    var cg=conges.find(function(g){return g.id===id;});
+    let fb =window.__fb;
+    let cg =conges.find(function(g){return g.id===id;});
     if(!cg) return;
-    var data={empId:cg.empId,type:cg.type,debut:cg.debut,fin:cg.fin,note:cg.note,statut:'valide',demandeLe:cg.demandeLe||''};
+    let data ={empId:cg.empId,type:cg.type,debut:cg.debut,fin:cg.fin,note:cg.note,statut:'valide',demandeLe:cg.demandeLe||''};
     try{await fb.setDoc(fb.doc(fb.db,'conges',id),data);}catch(e){console.error(e);}
   };
 
-  var refuserCg = async function(id){
+  let refuserCg = async function(id){
     if(!fbReady) return;
-    var fb=window.__fb;
-    var cg=conges.find(function(g){return g.id===id;});
+    let fb =window.__fb;
+    let cg =conges.find(function(g){return g.id===id;});
     if(!cg) return;
-    var data={empId:cg.empId,type:cg.type,debut:cg.debut,fin:cg.fin,note:cg.note,statut:'refuse',demandeLe:cg.demandeLe||''};
+    let data ={empId:cg.empId,type:cg.type,debut:cg.debut,fin:cg.fin,note:cg.note,statut:'refuse',demandeLe:cg.demandeLe||''};
     try{await fb.setDoc(fb.doc(fb.db,'conges',id),data);}catch(e){console.error(e);}
   };
 
-  var delCg = async function(id){
+  let delCg = async function(id){
     if(!fbReady) return;
-    var fb=window.__fb;
+    let fb =window.__fb;
     try{await fb.deleteDoc(fb.doc(fb.db,'conges',id));}catch(e){}
   };
 
-  var autoFill = async function(){
+  let autoFill = async function(){
     if(!fbReady||!isAdmin) return;
-    var weekDays=getWD(monday);
-    var nc=Object.assign({},cells);
+    let weekDays =getWD(monday);
+    let nc =Object.assign({},cells);
     ['Mathieu','Corentin'].forEach(function(name){
-      var emp=employees.find(function(e){return e.name===name;});
+      let emp =employees.find(function(e){return e.name===name;});
       if(!emp) return;
-      var sched=FIXED_SCHEDULES[name];
+      let sched =FIXED_SCHEDULES[name];
       weekDays.forEach(function(d){
-        var k=dk(d), val=sched[d.getDay()];
+        let k =dk(d), val=sched[d.getDay()];
         if(!val) return;
         if(!(cells[emp.id]||{})[k]){
           nc[emp.id]=Object.assign({},nc[emp.id]||{});
@@ -532,13 +532,13 @@ function App() {
     setCells(nc); await saveC(nc);
   };
 
-  var exportRecap = function(){
-    var sep='============================================================';
-    var mLabel=frM(recapY,recapM).toUpperCase();
-    var txt=sep+'\n  COMPTE RENDU - '+mLabel+'\n'+sep+'\n\n';
-    var visEmps=isAdmin?employees:employees.filter(function(e){return e.name===session.user;});
+  let exportRecap = function(){
+    let sep ='============================================================';
+    let mLabel =frM(recapY,recapM).toUpperCase();
+    let txt =sep+'\n  COMPTE RENDU - '+mLabel+'\n'+sep+'\n\n';
+    let visEmps =isAdmin?employees:employees.filter(function(e){return e.name===session.user;});
     visEmps.forEach(function(emp){
-      var s=monthStats(emp.id,recapY,recapM);
+      let s =monthStats(emp.id,recapY,recapM);
       txt+='------------------------------------------------------------\n';
       txt+='  '+emp.name.toUpperCase()+' (contrat '+s.hSem+'h/sem)\n';
       txt+='------------------------------------------------------------\n';
@@ -555,19 +555,19 @@ function App() {
       txt+='------------------------------------------------------------\n\n';
     });
     txt+='\nExport du '+new Date().toLocaleDateString('fr-FR')+'\n';
-    var blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a');
+    let blob =new Blob([txt],{type:'text/plain;charset=utf-8'});
+    let url =URL.createObjectURL(blob);
+    let a =document.createElement('a');
     a.href=url; a.download='Compte_rendu_'+mLabel.replace(/ /g,'_')+'.txt'; a.click();
     URL.revokeObjectURL(url);
   };
 
   // Styles
-  var bs={padding:'7px 14px',borderRadius:8,border:'1px solid #e0e0e0',background:'#fff',color:'#555',fontWeight:600,cursor:'pointer',fontSize:13};
-  var lb={display:'block',fontSize:11,fontWeight:700,color:'#888',textTransform:'uppercase',letterSpacing:'0.4px',marginBottom:5};
-  var ip={width:'100%',border:'1.5px solid #e5e7eb',borderRadius:9,padding:'9px 11px',fontSize:13,color:'#1a1a2e',background:'#f8f9fa',boxSizing:'border-box'};
+  let bs ={padding:'7px 14px',borderRadius:8,border:'1px solid #e0e0e0',background:'#fff',color:'#555',fontWeight:600,cursor:'pointer',fontSize:13};
+  let lb ={display:'block',fontSize:11,fontWeight:700,color:'#888',textTransform:'uppercase',letterSpacing:'0.4px',marginBottom:5};
+  let ip ={width:'100%',border:'1.5px solid #e5e7eb',borderRadius:9,padding:'9px 11px',fontSize:13,color:'#1a1a2e',background:'#f8f9fa',boxSizing:'border-box'};
 
-  var nb = function(v, label){
+  let nb = function(v, label){
     return React.createElement('button',{
       key:v, onClick:function(){setView(v);},
       style:{padding:'7px 14px',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:700,whiteSpace:'nowrap',
@@ -577,12 +577,12 @@ function App() {
   };
 
   // ── PLANNING ─────────────────────────────────────────────────────────────────
-  var renderPlanning = function(){
-    var weekDays=getWD(monday);
-    var ouvres=weekDays.filter(function(d){return !isWE(d);});
-    var dims=weekDays.filter(function(d){return isWE(d);});
+  let renderPlanning = function(){
+    let weekDays =getWD(monday);
+    let ouvres =weekDays.filter(function(d){return !isWE(d);});
+    let dims =weekDays.filter(function(d){return isWE(d);});
 
-    var navRow = React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}},
+    let navRow = React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}},
       React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8}},
         React.createElement('button',{onClick:function(){setMonday(function(p){return addD(p,-7);});},style:Object.assign({},bs,isMobile?{padding:'10px 16px',fontSize:18}:{})},'\u2039'),
         React.createElement('div',{style:{textAlign:'center'}},
@@ -596,7 +596,7 @@ function App() {
         isMobile?'Auto-remplir':'Auto-remplir Mathieu & Corentin')
     );
 
-    var headerRow = React.createElement('tr',{style:{background:'#fafafa',borderBottom:'2px solid #ebebeb'}},
+    let headerRow = React.createElement('tr',{style:{background:'#fafafa',borderBottom:'2px solid #ebebeb'}},
       React.createElement('th',{style:{padding:'12px 8px',width:isMobile?52:110,textAlign:'left',fontSize:12,fontWeight:700,color:'#aaa',borderRight:'2px solid #ebebeb',position:'sticky',left:0,background:'#fafafa',zIndex:3}},'Jour'),
       employees.map(function(emp,ei){
         return React.createElement('th',{key:emp.id,style:{padding:'8px 4px',textAlign:'center',minWidth:isMobile?75:130,borderRight:'1px solid #ebebeb'}},
@@ -605,21 +605,21 @@ function App() {
       !isMobile&&React.createElement('th',{style:{padding:'10px 8px',textAlign:'center',minWidth:90,fontSize:11,fontWeight:700,color:'#aaa',background:'#fafafa'}},'Total')
     );
 
-    var makeRow = function(d, di, isOuvre){
-      var k=dk(d), isT=k===dk(today);
-      var jourLabel=isOuvre?JOURS[d.getDay()-1]:'Dim';
-      var bg=isT?'#f0f6ff':isOuvre?'#fff':'#f9f9f9';
+    let makeRow = function(d, di, isOuvre){
+      let k =dk(d), isT=k===dk(today);
+      let jourLabel =isOuvre?JOURS[d.getDay()-1]:'Dim';
+      let bg =isT?'#f0f6ff':isOuvre?'#fff':'#f9f9f9';
       return React.createElement('tr',{key:k,style:{borderBottom:'1px solid #f0f0f0',background:bg}},
         React.createElement('td',{style:{padding:isMobile?'6px 4px':'10px 16px',fontWeight:700,fontSize:isMobile?11:13,color:isT?'#1a6ed8':isOuvre?'#1a1a2e':'#ccc',borderRight:'2px solid #ebebeb',position:'sticky',left:0,background:bg,zIndex:2,whiteSpace:'nowrap',textAlign:isMobile?'center':'left'}},
           React.createElement('div',{style:{fontWeight:800}},isMobile?jourLabel.slice(0,3):jourLabel),
           React.createElement('div',{style:{fontSize:isMobile?10:11,color:isT?'#1a6ed8':'#aaa'}},frDC(d))
         ),
         employees.map(function(emp,ei){
-          var cv=getCellVal(emp.id,k);
-          var bg2=cellBg(cv?cv.val:'',ei), tc=cellTxt(cv?cv.val:'');
-          var h=cv?parseH(cv.val,d.getDay()):0;
-          var isFT=cv&&cv.val&&cv.val.toUpperCase().includes("FERIE TRAVAIL");
-          var canClick=isAdmin&&!(cv&&cv.fromCg);
+          let cv =getCellVal(emp.id,k);
+          let bg2 =cellBg(cv?cv.val:'',ei), tc=cellTxt(cv?cv.val:'');
+          let h =cv?parseH(cv.val,d.getDay()):0;
+          let isFT =cv&&cv.val&&cv.val.toUpperCase().includes("FERIE TRAVAIL");
+          let canClick =isAdmin&&!(cv&&cv.fromCg);
           return React.createElement('td',{key:emp.id,
             onClick:canClick?function(){openModal(emp.id,d,isOuvre?d.getDay()-1:6);}:null,
             style:{padding:'4px 3px',borderRight:'1px solid #f0f0f0',background:cv&&cv.val?bg2:(isOuvre?'#fff':'#f9f9f9'),cursor:canClick?'pointer':'default',textAlign:'center',verticalAlign:'middle',minWidth:isMobile?75:130}},
@@ -634,17 +634,17 @@ function App() {
         }),
         !isMobile&&React.createElement('td',{style:{padding:'6px 8px',textAlign:'center',background:isT?'#f0f6ff':'#fafafa'}},
           function(){
-            var ws=weekStats(emp.id,ouvres);
+            let ws =weekStats(emp.id,ouvres);
             return null;
           }()
         )
       );
     };
 
-    var totalRow = React.createElement('tr',{style:{background:'#f5f6f8',borderTop:'2px solid #ebebeb'}},
+    let totalRow = React.createElement('tr',{style:{background:'#f5f6f8',borderTop:'2px solid #ebebeb'}},
       React.createElement('td',{style:{padding:isMobile?'8px 4px':'10px 16px',fontWeight:800,fontSize:isMobile?10:12,color:'#555',borderRight:'2px solid #ebebeb',position:'sticky',left:0,background:'#f5f6f8',zIndex:2,textAlign:isMobile?'center':'left'}},'Total'),
       employees.map(function(emp,ei){
-        var ws=weekStats(emp.id,ouvres);
+        let ws =weekStats(emp.id,ouvres);
         return React.createElement('td',{key:emp.id,style:{padding:isMobile?'6px 2px':'10px 8px',textAlign:'center',borderRight:'1px solid #ebebeb'}},
           React.createElement('div',{style:{fontWeight:800,fontSize:isMobile?13:15,color:ws.tot>=ws.hSem?'#059669':'#dc2626'}},ws.tot+'h'),
           React.createElement('div',{style:{fontSize:isMobile?9:11,color:'#aaa'}},'/'+ws.hSem+'h'),
@@ -654,7 +654,7 @@ function App() {
       !isMobile&&React.createElement('td',{style:{background:'#f5f6f8'}})
     );
 
-    var legende=[
+    let legende =[
       {l:'Bureau',bg:'#e8f0fe',c:'#1a6ed8'},{l:'Chateau',bg:'#fff8e1',c:'#78350f'},
       {l:'T-C',bg:'#ede8ff',c:'#4c1d95'},{l:'Tours N',bg:'#e8f8ee',c:'#14532d'},
       {l:'Blere',bg:'#fce8ff',c:'#9333ea'},{l:'Conge',bg:'#e8f8f0',c:'#065f46'},
@@ -686,31 +686,31 @@ function App() {
   };
 
   // ── CONGES ───────────────────────────────────────────────────────────────────
-  var renderConges = function(){
-    var firstDay=new Date(cgYear,cgMonth,1), lastDay=new Date(cgYear,cgMonth+1,0);
-    var startWD=firstDay.getDay()===0?6:firstDay.getDay()-1;
-    var rows=Math.ceil((startWD+lastDay.getDate())/7);
-    var navCg=function(dir){var m=cgMonth+dir,y=cgYear;if(m<0){m=11;y--;}if(m>11){m=0;y++;}setCgMonth(m);setCgYear(y);};
-    var getCongesJ=function(dStr){return conges.filter(function(g){return dStr>=g.debut&&dStr<=g.fin&&(g.statut==='valide'||g.statut==='attente');});};
-    var myEmpId=employees.find(function(e){return e.name===session.user;});
+  let renderConges = function(){
+    let firstDay =new Date(cgYear,cgMonth,1), lastDay=new Date(cgYear,cgMonth+1,0);
+    let startWD =firstDay.getDay()===0?6:firstDay.getDay()-1;
+    let rows =Math.ceil((startWD+lastDay.getDate())/7);
+    let navCg =function(dir){let m =cgMonth+dir,y=cgYear;if(m<0){m=11;y--;}if(m>11){m=0;y++;}setCgMonth(m);setCgYear(y);};
+    let getCongesJ =function(dStr){return conges.filter(function(g){return dStr>=g.debut&&dStr<=g.fin&&(g.statut==='valide'||g.statut==='attente');});};
+    let myEmpId =employees.find(function(e){return e.name===session.user;});
     myEmpId=myEmpId?myEmpId.id:null;
-    var clickDay=function(day){
-      var s=cgYear+'-'+pad(cgMonth+1)+'-'+pad(day);
+    let clickDay =function(day){
+      let s =cgYear+'-'+pad(cgMonth+1)+'-'+pad(day);
       if(!selS||(selS&&selE)){setSelS(s);setSelE(null);}
-      else{var lo=s<selS?s:selS,hi=s<selS?selS:s;setSelS(lo);setSelE(hi);setCgDeb(lo);setCgFin(hi);}
+      else{let lo =s<selS?s:selS,hi=s<selS?selS:s;setSelS(lo);setSelE(hi);setCgDeb(lo);setCgFin(hi);}
     };
-    var inRange=function(day){
-      var s=cgYear+'-'+pad(cgMonth+1)+'-'+pad(day);
+    let inRange =function(day){
+      let s =cgYear+'-'+pad(cgMonth+1)+'-'+pad(day);
       if(selS&&selE)return s>=selS&&s<=selE;
-      if(selS&&hovD){var lo=selS<hovD?selS:hovD,hi=selS<hovD?hovD:selS;return s>=lo&&s<=hi;}
+      if(selS&&hovD){let lo =selS<hovD?selS:hovD,hi=selS<hovD?hovD:selS;return s>=lo&&s<=hi;}
       return false;
     };
-    var sColor=function(st){return st==='valide'?'#059669':st==='attente'?'#d97706':'#dc2626';};
-    var sBg=function(st){return st==='valide'?'#ecfdf5':st==='attente'?'#fffbeb':'#fef2f2';};
-    var sLabel=function(st){return st==='valide'?'Valide':st==='attente'?'En attente':'Refuse';};
-    var enAttente=conges.filter(function(g){return g.statut==='attente';});
-    var mesDemandes=conges.filter(function(g){return g.empId===myEmpId;});
-    var minDate=function(){var d=new Date();d.setMonth(d.getMonth()+1);return d.toISOString().split('T')[0];};
+    let sColor =function(st){return st==='valide'?'#059669':st==='attente'?'#d97706':'#dc2626';};
+    let sBg =function(st){return st==='valide'?'#ecfdf5':st==='attente'?'#fffbeb':'#fef2f2';};
+    let sLabel =function(st){return st==='valide'?'Valide':st==='attente'?'En attente':'Refuse';};
+    let enAttente =conges.filter(function(g){return g.statut==='attente';});
+    let mesDemandes =conges.filter(function(g){return g.empId===myEmpId;});
+    let minDate =function(){let d =new Date();d.setMonth(d.getMonth()+1);return d.toISOString().split('T')[0];};
 
     return React.createElement('div',null,
       React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12,marginBottom:16}},
@@ -721,8 +721,8 @@ function App() {
       isAdmin&&enAttente.length>0&&React.createElement('div',{style:{background:'#fffbeb',border:'2px solid #fde68a',borderRadius:12,padding:16,marginBottom:16}},
         React.createElement('div',{style:{fontSize:14,fontWeight:800,color:'#92400e',marginBottom:12}},enAttente.length+' demande(s) en attente'),
         enAttente.map(function(g){
-          var emp=employees.find(function(e){return e.id===g.empId;}), ei=employees.findIndex(function(e){return e.id===g.empId;});
-          var j=jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));
+          let emp =employees.find(function(e){return e.id===g.empId;}), ei=employees.findIndex(function(e){return e.id===g.empId;});
+          let j =jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));
           return React.createElement('div',{key:g.id,style:{display:'flex',alignItems:'center',gap:8,padding:'10px 12px',background:'#fff',borderRadius:10,marginBottom:8,border:'1px solid #fde68a',flexWrap:'wrap'}},
             React.createElement('div',{style:{flex:1,minWidth:150}},
               React.createElement('div',{style:{fontWeight:800,fontSize:13,color:eAcc(ei)}},(emp?emp.name:'?')+' - '+g.type+' ('+j+'j)'),
@@ -756,12 +756,12 @@ function App() {
           ),
           React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:isMobile?4:2}},
             Array.from({length:rows*7},function(_,i){
-              var day=i-startWD+1, ok=day>=1&&day<=lastDay.getDate();
-              var dStr=ok?cgYear+'-'+pad(cgMonth+1)+'-'+pad(day):'';
-              var dObj=ok?new Date(cgYear,cgMonth,day):null;
-              var we=dObj&&isWE(dObj), isT=dStr===dk(today);
-              var cgsJ=ok?getCongesJ(dStr):[];
-              var inR=ok&&inRange(day), isSS=dStr===selS, isSE=dStr===selE;
+              let day =i-startWD+1, ok=day>=1&&day<=lastDay.getDate();
+              let dStr =ok?cgYear+'-'+pad(cgMonth+1)+'-'+pad(day):'';
+              let dObj =ok?new Date(cgYear,cgMonth,day):null;
+              let we =dObj&&isWE(dObj), isT=dStr===dk(today);
+              let cgsJ =ok?getCongesJ(dStr):[];
+              let inR =ok&&inRange(day), isSS=dStr===selS, isSE=dStr===selE;
               return React.createElement('div',{key:i,
                 onClick:function(){if(ok&&!we)clickDay(day);},
                 onMouseEnter:function(){if(ok&&selS&&!selE)setHovD(dStr);},
@@ -773,9 +773,9 @@ function App() {
                 ok&&[
                   React.createElement('div',{key:'d',style:{fontSize:isMobile?13:10,fontWeight:isT?800:600,color:isSS||isSE?'#fff':we?'#ccc':'#333',textAlign:'center',marginBottom:1}},day),
                   cgsJ.slice(0,2).map(function(g){
-                    var ei=employees.findIndex(function(e){return e.id===g.empId;});
-                    var dotColor=g.statut==='valide'?eAcc(ei):g.statut==='attente'?'#d97706':'#dc2626';
-                    var empName=(employees.find(function(e){return e.id===g.empId;})||{name:'?'}).name;
+                    let ei =employees.findIndex(function(e){return e.id===g.empId;});
+                    let dotColor =g.statut==='valide'?eAcc(ei):g.statut==='attente'?'#d97706':'#dc2626';
+                    let empName =(employees.find(function(e){return e.id===g.empId;})||{name:'?'}).name;
                     return React.createElement('div',{key:g.id,style:{fontSize:8,fontWeight:700,color:'#fff',background:dotColor,borderRadius:3,padding:'1px 3px',marginBottom:1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}},empName.slice(0,5));
                   }),
                   cgsJ.length>2&&React.createElement('div',{key:'more',style:{fontSize:7,color:'#aaa'}},'+'+( cgsJ.length-2))
@@ -788,8 +788,8 @@ function App() {
           ),
           React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:5,marginTop:12,paddingTop:10,borderTop:'1px solid #f0f0f0'}},
             employees.map(function(emp,ei){
-              var nb=conges.filter(function(g){return g.empId===emp.id&&g.statut==='valide';}).length;
-              var att=conges.filter(function(g){return g.empId===emp.id&&g.statut==='attente';}).length;
+              let nb =conges.filter(function(g){return g.empId===emp.id&&g.statut==='valide';}).length;
+              let att =conges.filter(function(g){return g.empId===emp.id&&g.statut==='attente';}).length;
               return React.createElement('span',{key:emp.id,style:{background:eAcc(ei)+'22',color:eAcc(ei),border:'1px solid '+eAcc(ei)+'44',borderRadius:6,padding:'3px 8px',fontSize:isMobile?12:10,fontWeight:700}},
                 emp.name+(nb>0?' ('+nb+')':(att>0?' ('+att+' att.)':'')));
             })
@@ -813,7 +813,7 @@ function App() {
             React.createElement('label',{style:lb},'Type'),
             React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:5,marginBottom:10}},
               TYPES_CG.map(function(t,ti){
-                var col=CG_COLORS[t]||'#94a3b8';
+                let col =CG_COLORS[t]||'#94a3b8';
                 return React.createElement('button',{key:t,onClick:function(){setCgType(t);},
                   style:{padding:'5px 10px',borderRadius:20,border:'1.5px solid '+(cgType===t?col:'#e5e7eb'),background:cgType===t?col+'22':'#fff',color:cgType===t?col:'#555',fontWeight:700,fontSize:12,cursor:'pointer'}},
                   TYPES_CG[ti]);
@@ -840,8 +840,8 @@ function App() {
             React.createElement('div',{style:{fontSize:13,fontWeight:800,color:'#1a1a2e',marginBottom:12}},'Mes demandes ('+mesDemandes.length+')'),
             mesDemandes.length===0?React.createElement('div',{style:{color:'#ccc',fontSize:13,textAlign:'center',padding:'14px 0'}},'Aucune demande'):
             [...mesDemandes].sort(function(a,b){return b.demandeLe.localeCompare(a.demandeLe);}).map(function(g){
-              var col=CG_COLORS[g.type]||'#94a3b8';
-              var j=jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));
+              let col =CG_COLORS[g.type]||'#94a3b8';
+              let j =jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));
               return React.createElement('div',{key:g.id,style:{padding:'10px 12px',background:sBg(g.statut),borderRadius:10,marginBottom:8,border:'1px solid '+sColor(g.statut)+'33',borderLeft:'4px solid '+sColor(g.statut)}},
                 React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}},
                   React.createElement('div',{style:{display:'flex',alignItems:'center',gap:5}},
@@ -863,9 +863,9 @@ function App() {
             React.createElement('div',{style:{fontSize:13,fontWeight:800,color:'#1a1a2e',marginBottom:12}},'Tous les conges ('+conges.length+')'),
             conges.length===0?React.createElement('div',{style:{color:'#ccc',textAlign:'center',padding:'14px 0'}},'Aucun conge'):
             [...conges].sort(function(a,b){return a.debut.localeCompare(b.debut);}).map(function(g){
-              var emp=employees.find(function(e){return e.id===g.empId;}), ei=employees.findIndex(function(e){return e.id===g.empId;});
-              var col=CG_COLORS[g.type]||'#94a3b8';
-              var j=jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));
+              let emp =employees.find(function(e){return e.id===g.empId;}), ei=employees.findIndex(function(e){return e.id===g.empId;});
+              let col =CG_COLORS[g.type]||'#94a3b8';
+              let j =jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));
               return React.createElement('div',{key:g.id,style:{display:'flex',alignItems:'flex-start',gap:8,padding:'8px 10px',background:sBg(g.statut),borderRadius:9,marginBottom:6,borderLeft:'4px solid '+(g.statut==='valide'?eAcc(ei):sColor(g.statut))}},
                 React.createElement('div',{style:{flex:1}},
                   React.createElement('div',{style:{display:'flex',alignItems:'center',gap:5,marginBottom:2,flexWrap:'wrap'}},
@@ -886,11 +886,11 @@ function App() {
           React.createElement('div',{style:{background:'#fff',borderRadius:14,padding:18,boxShadow:'0 2px 8px rgba(0,0,0,0.05)',border:'1px solid #e5e7eb'}},
             React.createElement('div',{style:{fontSize:13,fontWeight:800,color:'#1a1a2e',marginBottom:12}},'Soldes valides'),
             employees.map(function(emp,ei){
-              var myCgs=conges.filter(function(g){return g.empId===emp.id&&g.statut==='valide';});
-              var cpJ=myCgs.filter(function(g){return g.type==='Conge';}).reduce(function(s,g){return s+jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));},0);
-              var rttJ=myCgs.filter(function(g){return g.type==='RTT';}).reduce(function(s,g){return s+jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));},0);
-              var tot=myCgs.reduce(function(s,g){return s+jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));},0);
-              var att=conges.filter(function(g){return g.empId===emp.id&&g.statut==='attente';}).length;
+              let myCgs =conges.filter(function(g){return g.empId===emp.id&&g.statut==='valide';});
+              let cpJ =myCgs.filter(function(g){return g.type==='Conge';}).reduce(function(s,g){return s+jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));},0);
+              let rttJ =myCgs.filter(function(g){return g.type==='RTT';}).reduce(function(s,g){return s+jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));},0);
+              let tot =myCgs.reduce(function(s,g){return s+jouvres(new Date(g.debut+'T12:00'),new Date(g.fin+'T12:00'));},0);
+              let att =conges.filter(function(g){return g.empId===emp.id&&g.statut==='attente';}).length;
               return React.createElement('div',{key:emp.id,style:{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',borderRadius:8,marginBottom:5,background:'#f8f9fa',borderLeft:'4px solid '+eAcc(ei)}},
                 React.createElement('span',{style:{fontWeight:700,fontSize:12,color:eAcc(ei),minWidth:70}},emp.name),
                 React.createElement('span',{style:{fontSize:11,color:'#059669',fontWeight:700}},cpJ+'j CP'),
@@ -906,11 +906,11 @@ function App() {
   };
 
   // ── RECAP ────────────────────────────────────────────────────────────────────
-  var renderRecap = function(){
-    var weeks=getMonthWeeks(recapY,recapM);
-    var navR=function(dir){var m=recapM+dir,y=recapY;if(m<0){m=11;y--;}if(m>11){m=0;y++;}setRecapM(m);setRecapY(y);};
-    var tdS={padding:'7px 10px',fontSize:12,color:'#444',verticalAlign:'middle'};
-    var visEmps=isAdmin?employees:employees.filter(function(e){return e.name===session.user;});
+  let renderRecap = function(){
+    let weeks =getMonthWeeks(recapY,recapM);
+    let navR =function(dir){let m =recapM+dir,y=recapY;if(m<0){m=11;y--;}if(m>11){m=0;y++;}setRecapM(m);setRecapY(y);};
+    let tdS ={padding:'7px 10px',fontSize:12,color:'#444',verticalAlign:'middle'};
+    let visEmps =isAdmin?employees:employees.filter(function(e){return e.name===session.user;});
 
     return React.createElement('div',null,
       React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12,marginBottom:20,flexWrap:'wrap'}},
@@ -925,24 +925,24 @@ function App() {
       ),
 
       visEmps.map(function(emp){
-        var realEi=employees.findIndex(function(e){return e.id===emp.id;});
-        var s=monthStats(emp.id,recapY,recapM);
-        var wRows=weeks.map(function(w){
-          var wH=0,wHS=0,wHF=0;
+        let realEi =employees.findIndex(function(e){return e.id===emp.id;});
+        let s =monthStats(emp.id,recapY,recapM);
+        let wRows =weeks.map(function(w){
+          let wH =0,wHS=0,wHF=0;
           w.wd.forEach(function(d){
-            var cv=getCellVal(emp.id,dk(d));
+            let cv =getCellVal(emp.id,dk(d));
             if(!cv) return;
-            var up=(cv.val||'').toUpperCase(), h=parseH(cv.val,d.getDay());
+            let up =(cv.val||'').toUpperCase(), h=parseH(cv.val,d.getDay());
             if(up.includes("FERIE TRAVAIL")) wHF+=Math.round(h*1.25*10)/10;
             else if(up!=="OFF"){ wH+=h; if(cv.hsupp)wHS+=Number(cv.hsupp); }
           });
           wH=Math.round(wH*10)/10; wHF=Math.round(wHF*10)/10;
-          var th=w.wd.length*(s.hSem/5), tot=Math.round((wH+wHS+wHF)*10)/10;
-          var diff=Math.round((tot-s.hSem)*10)/10;
+          let th =w.wd.length*(s.hSem/5), tot=Math.round((wH+wHS+wHF)*10)/10;
+          let diff =Math.round((tot-s.hSem)*10)/10;
           return {mon:w.mon,wd:w.wd,wH:wH,wHS:wHS,wHF:wHF,th:Math.round(th*10)/10,tot:tot,diff:diff};
         });
 
-        var statBoxes=[
+        let statBoxes =[
           {l:'H.travaillees',v:s.hT,u:'h',c:'#1a6ed8'},
           {l:'H.supp.',v:s.hS,u:'h',c:'#d97706'},
           {l:'Feries trav.',v:s.ftJ,u:'j',c:'#c2410c'},
@@ -1025,7 +1025,7 @@ function App() {
           ),
           React.createElement('tbody',null,
             employees.map(function(emp,ei){
-              var s=monthStats(emp.id,recapY,recapM);
+              let s =monthStats(emp.id,recapY,recapM);
               return React.createElement('tr',{key:emp.id},
                 React.createElement('td',{style:{padding:'7px 8px',color:'#fff',fontWeight:700,borderBottom:'1px solid #333',fontSize:12}},
                   React.createElement('span',{style:{color:eAcc(ei)}},'• '),emp.name),
@@ -1047,10 +1047,10 @@ function App() {
   };
 
   // ── EQUIPE ───────────────────────────────────────────────────────────────────
-  var renderEquipe = function(){
-    var addEmp=async function(){
+  let renderEquipe = function(){
+    let addEmp =async function(){
       if(!newName.trim()) return;
-      var l=[...employees,{id:'e'+Date.now(),name:newName.trim(),hSem:35}];
+      let l =[...employees,{id:'e'+Date.now(),name:newName.trim(),hSem:35}];
       setEmployees(l); await saveE(l); setNewName('');
     };
     return React.createElement('div',{style:{maxWidth:480}},
@@ -1060,7 +1060,7 @@ function App() {
           React.createElement('span',{style:{color:eAcc(ei)}},'•'),
           React.createElement('span',{style:{flex:1,fontWeight:700,fontSize:14}},emp.name),
           React.createElement('span',{style:{fontSize:11,color:'#aaa'}},emp.hSem+'h/sem'),
-          React.createElement('button',{onClick:async function(){var l=employees.filter(function(e){return e.id!==emp.id;}); setEmployees(l); await saveE(l);},
+          React.createElement('button',{onClick:async function(){let l =employees.filter(function(e){return e.id!==emp.id;}); setEmployees(l); await saveE(l);},
             style:{background:'none',border:'none',color:'#ef4444',cursor:'pointer',fontSize:16}},'X')
         );
       }),
@@ -1074,17 +1074,17 @@ function App() {
   };
 
   // ── MODAL
-  var renderModal = function(){
+  let renderModal = function(){
 
     if(!modal) return null;
-    var emp=employees.find(function(e){return e.id===modal.empId;}), ei=employees.findIndex(function(e){return e.id===modal.empId;});
-    var toMin=function(t){var p=t.replace(/[hH]/,':').split(':');return parseInt(p[0])*60+(parseInt(p[1])||0);};
-    var dureeRaw=mDeb&&mFin?toMin(mFin)-toMin(mDeb):0;
-    var isCh=mLieu.toUpperCase().includes("CHATEAU")||mLieu.toUpperCase().includes("BLERE");
-    var isSam=modal.date.getDay()===6;
-    var pause=dureeRaw>360?(isCh?(isSam?60:90):60):0;
-    var duree=mDeb&&mFin?Math.round((dureeRaw-pause)/60*10)/10:null;
-    var slS={flex:1,border:'1.5px solid #e5e7eb',borderRadius:9,padding:'8px 7px',fontSize:13,color:'#1a1a2e',background:'#f8f9fa'};
+    let emp =employees.find(function(e){return e.id===modal.empId;}), ei=employees.findIndex(function(e){return e.id===modal.empId;});
+    let toMin =function(t){let p =t.replace(/[hH]/,':').split(':');return parseInt(p[0])*60+(parseInt(p[1])||0);};
+    let dureeRaw =mDeb&&mFin?toMin(mFin)-toMin(mDeb):0;
+    let isCh =mLieu.toUpperCase().includes("CHATEAU")||mLieu.toUpperCase().includes("BLERE");
+    let isSam =modal.date.getDay()===6;
+    let pause =dureeRaw>360?(isCh?(isSam?60:90):60):0;
+    let duree =mDeb&&mFin?Math.round((dureeRaw-pause)/60*10)/10:null;
+    let slS ={flex:1,border:'1.5px solid #e5e7eb',borderRadius:9,padding:'8px 7px',fontSize:13,color:'#1a1a2e',background:'#f8f9fa'};
     return React.createElement('div',{
       onClick:function(e){if(e.target===e.currentTarget)setModal(null);},
       style:{position:'fixed',inset:0,background:'rgba(0,0,0,0.35)',display:'flex',alignItems:isMobile?'flex-end':'center',justifyContent:'center',zIndex:100,backdropFilter:'blur(3px)'}},
@@ -1100,7 +1100,7 @@ function App() {
           })
         ),
         React.createElement('div',{style:{marginBottom:12}},
-          React.createElement('button',{onClick:function(){setMFerie(function(f){var nf=!f;if(nf){setMAbs('');setMLieu('');}return nf;});},
+          React.createElement('button',{onClick:function(){setMFerie(function(f){let nf =!f;if(nf){setMAbs('');setMLieu('');}return nf;});},
             style:{padding:'6px 14px',borderRadius:20,border:'1.5px solid '+(mFerie?'#c2410c':'#e5e7eb'),background:mFerie?'#fff0e0':'#fff',color:mFerie?'#c2410c':'#555',fontWeight:700,fontSize:12,cursor:'pointer'}},
             'Ferie travaille'),
           mFerie&&React.createElement('span',{style:{marginLeft:8,fontSize:11,color:'#c2410c',fontWeight:600}},'heures x1.25')
