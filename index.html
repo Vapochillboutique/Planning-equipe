@@ -39,8 +39,8 @@ input,select,button{font-family:inherit;outline:none;}
 
 const JOURS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
 const H_STD = 7, H_SEM = 35;
-const LIEUX = ["Bureau","Chateau","T-C","Tours N","Reunion","Formation"];
-const LIEUX_DISPLAY = ["Bureau","Château","T-C","Tours N","Réunion","Formation"];
+const LIEUX = ["Bureau","Chateau","T-C","Tours N","Blere","Reunion","Formation"];
+const LIEUX_DISPLAY = ["Bureau","Château","T-C","Tours N","Bléré","Réunion","Formation"];
 const ABSENCES = ["OFF","Conge","RTT","Maladie","OFF/Ferie","Absence"];
 const ABSENCES_DISPLAY = ["OFF","Congé","RTT","Maladie","OFF/Férié","Absence"];
 const TYPES_CG = ["Conge","RTT","Maladie","OFF/Ferie","Absence"];
@@ -57,9 +57,9 @@ const DEFAULT_EMP = [
   {id:"e2",name:"Nicolas",   hSem:35},
   {id:"e3",name:"Charlotte", hSem:35},
   {id:"e4",name:"Marco",     hSem:35},
-  {id:"e5",name:"Alan",      hSem:37.5},
+  {id:"e5",name:"Alan",      hSem:35},
   {id:"e6",name:"Corentin",  hSem:38},
-  {id:"e7",name:"Mathieu",   hSem:37.5},
+  {id:"e7",name:"Mathieu",   hSem:38},
   {id:"e8",name:"Laura",     hSem:35},
 ];
 
@@ -123,7 +123,7 @@ const cellBg = (val, ei) => {
   if(up==="RTT") return '#e8f0ff';
   if(up==="MALADIE") return '#fde8e8';
   if(up.includes("T-C")) return '#ede8ff';
-  if(up.includes("TOURS")) return '#e8f8ee';
+  if(up.includes("BLERE")||up.includes("BLÉRÉ")) return '#fce8ff';
   if(up.includes("CHATEAU")||up.includes("CHÂTEAU")) return '#fff8e1';
   if(up.includes("FORMATION")||up.includes("REUNION")) return '#e8f8f0';
   return eBg(ei);
@@ -139,6 +139,7 @@ const cellTxt = val => {
   if(up==="RTT") return '#1e40af';
   if(up==="MALADIE") return '#991b1b';
   if(up.includes("T-C")) return '#4c1d95';
+  if(up.includes("BLERE")||up.includes("BLÉRÉ")) return '#9333ea';
   if(up.includes("TOURS")) return '#14532d';
   if(up.includes("CHATEAU")||up.includes("CHÂTEAU")) return '#78350f';
   return '#1a1a2e';
@@ -479,7 +480,49 @@ function App() {
     return {hT,hS,hFB,hFM,hTheo,hTot,ecart,cpJ,rttJ,malJ,fJ,ftJ,jo,offJ,hSem,hJour};
   };
 
-  const exportRecap = () => {
+  // Horaires fixes Mathieu (Bléré) et Corentin
+  // jour : 0=dim, 1=lun, 2=mar, 3=mer, 4=jeu, 5=ven, 6=sam
+  const FIXED_SCHEDULES = {
+    "Mathieu": {
+      1: "Blere 14h00/19h00",    // Lundi
+      2: "Blere 10h00/19h00",    // Mardi (2 créneaux → on met amplitude totale, pause auto)
+      3: "Blere 10h00/19h00",    // Mercredi
+      4: "Blere 14h00/19h00",    // Jeudi
+      5: "Blere 10h00/19h00",    // Vendredi
+      6: "Blere 10h00/14h30",    // Samedi
+      0: "OFF",                   // Dimanche
+    },
+    "Corentin": {
+      1: "Chateau 10h00/19h00",  // Lundi : 10h-13h30 + 15h-19h (coupure 15h)
+      2: "Chateau 10h00/19h00",  // Mardi : 10h-13h30 + 15h-19h
+      3: "Chateau 10h00/19h00",  // Mercredi : 10h-13h30 + 15h-19h
+      4: "OFF",                   // Jeudi
+      5: "Chateau 10h00/19h00",  // Vendredi : 10h-13h30 + 15h-19h
+      6: "Chateau 10h00/19h00",  // Samedi : 10h-13h30 + 14h30-19h
+      0: "OFF",                   // Dimanche
+    }
+  };
+
+  const autoFillWeek = async () => {
+    if(!fbReady||!isAdmin) return;
+    const weekDays = getWD(monday);
+    let nc = {...cells};
+    ['Mathieu','Corentin'].forEach(name => {
+      const emp = employees.find(e=>e.name===name);
+      if(!emp) return;
+      const sched = FIXED_SCHEDULES[name];
+      weekDays.forEach(d => {
+        const k = dk(d);
+        const val = sched[d.getDay()];
+        if(!val) return;
+        if(!(cells[emp.id]||{})[k]) { // ne pas écraser si déjà rempli
+          nc = {...nc, [emp.id]: {...(nc[emp.id]||{}), [k]: {val, hsupp:0}}};
+        }
+      });
+    });
+    setCells(nc);
+    await saveC(nc);
+  };
     const sep1 = '============================================================';
     const sep2 = '------------------------------------------------------------';
     const mLabel = frM(recapY,recapM).toUpperCase();
@@ -643,7 +686,7 @@ function App() {
           <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:10}}>
             {[
               {l:'Bureau',c:'#1a6ed8'},{l:'Chateau',c:'#78350f'},{l:'T-C',c:'#4c1d95'},
-              {l:'Tours N',c:'#14532d'},{l:'Conge',c:'#065f46'},{l:'RTT',c:'#1e40af'},
+              {l:'Tours N',c:'#14532d'},{l:'Blere',c:'#9333ea'},{l:'Conge',c:'#065f46'},{l:'RTT',c:'#1e40af'},
               {l:'Maladie',c:'#991b1b'},{l:'OFF/Ferie',c:'#b45309'},{l:'Ferie trav.',c:'#c2410c'}
             ].map(function(x){ return React.createElement('span',{key:x.l,style:{background:x.c+'15',color:x.c,border:'1px solid '+x.c+'33',borderRadius:20,padding:'2px 8px',fontSize:10,fontWeight:600}},x.l); })}
           </div>
@@ -654,15 +697,18 @@ function App() {
     // ── VUE DESKTOP ───────────────────────────────────────────────────────
     return (
       <div>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:10}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:isMobile?12:16,flexWrap:'wrap',gap:10}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <button onClick={()=>setMonday(p=>addD(p,-7))} style={bs}>&#8249;</button>
-            <div style={{textAlign:'center',minWidth:220}}>
-              <div style={{fontSize:17,fontWeight:800,color:'#1a1a2e'}}>{'Semaine '+frD(monday)+' au '+frD(addD(monday,5))}</div>
+            <button onClick={()=>setMonday(p=>addD(p,-7))} style={isMobile?{...bs,padding:'10px 16px',fontSize:18,borderRadius:10}:bs}>&#8249;</button>
+            <div style={{textAlign:'center',minWidth:isMobile?0:220}}>
+              <div style={{fontSize:isMobile?13:17,fontWeight:800,color:'#1a1a2e'}}>{isMobile?'Sem. '+frDC(monday)+' — '+frDC(addD(monday,5)):'Semaine '+frD(monday)+' au '+frD(addD(monday,5))}</div>
             </div>
             <button onClick={()=>setMonday(getMon(today))} style={{...bs,background:'#1a6ed8',color:'#fff',border:'none',fontSize:12,padding:'7px 10px'}}>Auj.</button>
-            <button onClick={()=>setMonday(p=>addD(p,7))} style={bs}>&#8250;</button>
+            <button onClick={()=>setMonday(p=>addD(p,7))} style={isMobile?{...bs,padding:'10px 16px',fontSize:18,borderRadius:10}:bs}>&#8250;</button>
           </div>
+          {isAdmin&&<button onClick={autoFillWeek} style={{padding:'7px 14px',borderRadius:8,border:'none',background:'#7c3aed',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer'}}>
+            ✨ Auto-remplir Mathieu & Corentin
+          </button>}
         </div>
         <div style={{background:'#fff',borderRadius:14,border:'1px solid #e5e7eb',boxShadow:'0 2px 12px rgba(0,0,0,0.05)',overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
           <table style={{borderCollapse:'collapse',width:'100%',minWidth:500}}>
@@ -769,7 +815,7 @@ function App() {
         <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:12}}>
           {[
             {l:'Bureau',bg:'#e8f0fe',c:'#1a6ed8'},{l:'Chateau',bg:'#fff8e1',c:'#78350f'},
-            {l:'T-C',bg:'#ede8ff',c:'#4c1d95'},{l:'Tours N',bg:'#e8f8ee',c:'#14532d'},
+            {l:'T-C',bg:'#ede8ff',c:'#4c1d95'},{l:'Tours N',bg:'#e8f8ee',c:'#14532d'},{l:'Blere',bg:'#fce8ff',c:'#9333ea'},
             {l:'Conge',bg:'#e8f8f0',c:'#065f46'},{l:'RTT',bg:'#e8f0ff',c:'#1e40af'},
             {l:'Maladie',bg:'#fde8e8',c:'#991b1b'},{l:'OFF/Ferie',bg:'#fff8e1',c:'#b45309'},
             {l:'Ferie travaille',bg:'#fff0e0',c:'#c2410c'},{l:'H.Supp',bg:'#fff8e1',c:'#d97706'}
