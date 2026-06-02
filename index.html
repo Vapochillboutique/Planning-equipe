@@ -53,8 +53,14 @@ const eAcc = i => EMP_ACC[i % EMP_ACC.length];
 const eBg  = i => EMP_BG[i  % EMP_BG.length];
 
 const DEFAULT_EMP = [
-  {id:"e1",name:"Laetitia"},{id:"e2",name:"Nicolas"},{id:"e3",name:"Charlotte"},
-  {id:"e4",name:"Marco"},{id:"e5",name:"Alan"},{id:"e6",name:"Corentin"},
+  {id:"e1",name:"Laetitia",  hSem:35},
+  {id:"e2",name:"Nicolas",   hSem:35},
+  {id:"e3",name:"Charlotte", hSem:35},
+  {id:"e4",name:"Marco",     hSem:35},
+  {id:"e5",name:"Alan",      hSem:37.5},
+  {id:"e6",name:"Corentin",  hSem:37.5},
+  {id:"e7",name:"Mathieu",   hSem:37.5},
+  {id:"e8",name:"Laura",     hSem:35},
 ];
 
 const USERS = [
@@ -274,7 +280,17 @@ function App() {
         setConges(list);
       } catch(e){ console.error('Erreur conges:', e); }
     }, e=>console.error('Listener conges:', e));
-    const u3=onSnapshot(doc(db,'planning','employees'),snap=>{if(snap.exists()&&snap.data().list&&snap.data().list.length>0)setEmployees(snap.data().list);});
+    const u3=onSnapshot(doc(db,'planning','employees'),snap=>{
+      if(snap.exists()&&snap.data().list&&snap.data().list.length>0){
+        // Fusionner les données Firebase avec les hSem par défaut
+        const fbList = snap.data().list;
+        const merged = fbList.map(e=>{
+          const def = DEFAULT_EMP.find(d=>d.name===e.name||d.id===e.id);
+          return {...e, hSem: e.hSem || (def?.hSem) || 35};
+        });
+        setEmployees(merged);
+      }
+    });
     return()=>{u1();u2();u3();};
   },[fbReady,session]);
 
@@ -400,24 +416,34 @@ function App() {
     setMLieu('');setMAbs('');setMDeb('');setMFin('');setMHS(0);setMFerie(false);setModal(null);
   };
 
+  const getHSem = empId => {
+    const emp = employees.find(e=>e.id===empId);
+    return emp?.hSem || H_SEM;
+  };
+  const getHJour = empId => Math.round(getHSem(empId)/5*10)/10;
+
   const weekStats = (empId, wDays) => {
-    let h=0,hs=0,hf=0,offJ=0;
+    const hSem = getHSem(empId);
+    let h=0,hs=0,hf=0;
     wDays.forEach(d=>{
       const cv=getCellVal(empId,dk(d));
       if(!cv) return;
       const up=(cv.val||'').toUpperCase();
       const heures=parseH(cv.val,d.getDay());
       if(up.includes("FERIE TRAVAIL")){ hf+=Math.round(heures*1.25*10)/10; }
-      else if(up==="OFF") { offJ++; } // jour de repos = exclu des théoriques
+      else if(up==="OFF") { /* jour de repos inclus dans le contrat, ne rien ajouter */ }
       else { h+=heures; if(cv.hsupp)hs+=Number(cv.hsupp); }
     });
-    // Théorique = 35h - (jours OFF × 7h)
-    const hTheoSem = H_SEM - (offJ * H_STD);
+    // La base théorique est TOUJOURS le contrat (35h ou 37.5h)
+    // Le jour OFF est déjà inclus dans ce contrat
+    const hTheoSem = hSem;
     const tot=Math.round((h+hs+hf)*10)/10;
     return {h:Math.round(h*10)/10, hs, hf, tot, diff:Math.round((tot-hTheoSem)*10)/10, hTheoSem};
   };
 
   const monthStats = (empId, y, m) => {
+    const hSem = getHSem(empId);
+    const hJour = Math.round(hSem/5*10)/10;
     const d=new Date(y,m,1);
     let hT=0,hS=0,hFB=0,hFM=0,cpJ=0,rttJ=0,malJ=0,fJ=0,ftJ=0,jo=0,offJ=0;
     while(d.getMonth()===m){
@@ -429,9 +455,9 @@ function App() {
         if(up.includes("FERIE TRAVAIL")){
           ftJ++; hFB+=h; hFM+=Math.round(h*1.25*10)/10;
         } else if(up==="OFF/FERIE"||up==="OFF/FÉRIÉ") {
-          fJ++; hT+=H_STD;
+          fJ++; hT+=hJour; // Férié payé = h contractuelles
         } else if(up==="OFF") {
-          offJ++; // jour de repos = ne compte pas dans les théoriques
+          offJ++; // jour de repos
         } else {
           hT+=h; if(cv.hsupp)hS+=Number(cv.hsupp);
           if(up.includes("CONGE")||up.includes("CONGÉ"))cpJ++;
@@ -443,13 +469,14 @@ function App() {
     }
     hT=Math.round(hT*10)/10; hFB=Math.round(hFB*10)/10; hFM=Math.round(hFM*10)/10;
 
-    // Heures théoriques = 35h × nombre de semaines du mois
-    // On compte les semaines travaillées (jours ouvrés - jours OFF) / 5
-    const joursActifs = jo - offJ; // jours ouvrés moins repos
-    const hTheo = Math.round((joursActifs / 5) * H_SEM * 10) / 10;
+    // Heures théoriques = nombre de semaines du mois × contrat
+    // Le jour OFF est inclus dans le contrat, on compte les semaines complètes
+    // Une semaine = 6 jours ouvrés (lun→sam) dans le planning
+    const nbSemaines = Math.round((jo / 6) * 10) / 10;
+    const hTheo = Math.round(nbSemaines * hSem * 10) / 10;
 
     const hTot=Math.round((hT+hS+hFM)*10)/10, ecart=Math.round((hTot-hTheo)*10)/10;
-    return {hT,hS,hFB,hFM,hTheo,hTot,ecart,cpJ,rttJ,malJ,fJ,ftJ,jo,offJ};
+    return {hT,hS,hFB,hFM,hTheo,hTot,ecart,cpJ,rttJ,malJ,fJ,ftJ,jo,offJ,hSem,hJour};
   };
 
   const exportRecap = () => {
@@ -1052,7 +1079,7 @@ function App() {
             React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,marginBottom:14}},
               React.createElement('span',{style:{color:eAcc(realEi),fontSize:15}},'\u25cf'),
               React.createElement('span',{style:{fontSize:15,fontWeight:800}},emp.name),
-              React.createElement('span',{style:{fontSize:11,color:'#aaa'}},s.jo+' jours ouvres - '+s.hTheo+'h theoriques')
+              React.createElement('span',{style:{fontSize:11,color:'#aaa'}},s.jo+' jours ouvres - '+s.hTheo+'h theoriques (contrat '+s.hSem+'h/sem)')
             ),
             React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:8,marginBottom:14}},
               [
