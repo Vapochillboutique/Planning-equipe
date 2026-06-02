@@ -41,7 +41,7 @@ const JOURS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"
 const H_STD = 7, H_SEM = 35;
 
 const LIEUX = ["Bureau","Chateau","T-C","Tours N","Blere","Reunion","Formation"];
-const LIEUX_DISPLAY = ["Bureau","Chateau","T-C","Tours N","Blere","Reunion","Formation"];
+const LIEUX_DISPLAY = ["Bureau","Château","T-C","Tours N","Bléré","Réunion","Formation"];
 const ABSENCES = ["OFF","Conge","RTT","Maladie","OFF/Ferie","Absence"];
 const ABSENCES_DISPLAY = ["OFF","Conge","RTT","Maladie","OFF/Ferie","Absence"];
 const TYPES_CG = ["Conge","RTT","Maladie","OFF/Ferie","Absence"];
@@ -58,10 +58,33 @@ const DEFAULT_EMP = [
   {id:"e3",name:"Charlotte", hSem:35},
   {id:"e4",name:"Marco",     hSem:35},
   {id:"e5",name:"Alan",      hSem:35},
-  {id:"e6",name:"Corentin",  hSem:38},
-  {id:"e7",name:"Mathieu",   hSem:38},
+  {id:"e6",name:"Corentin",  hSem:38.5},
+  {id:"e7",name:"Mathieu",   hSem:38.5},
   {id:"e8",name:"Laura",     hSem:35},
 ];
+
+// Horaires fixes Mathieu (Bléré) - jour semaine 0=dim,1=lun,...6=sam
+// Horaires fixes Mathieu (Bléré) — pause 1h midi (sauf lundi/jeudi soir et samedi)
+const HORAIRES_MATHIEU = {
+  1:"Blere 14h00/19h00",   // Lundi    : 5h (pas de pause)
+  2:"Blere 10h00/19h00",   // Mardi    : 9h - 1h pause = 8h
+  3:"Blere 10h00/19h00",   // Mercredi : 8h
+  4:"Blere 14h00/19h00",   // Jeudi    : 5h (pas de pause)
+  5:"Blere 10h00/19h00",   // Vendredi : 8h
+  6:"Blere 10h00/14h30",   // Samedi   : 4.5h (pas de pause)
+  0:"OFF",
+};
+
+// Horaires fixes Corentin (Château) — pause 1h30 lun-ven, 1h sam, jeudi OFF
+const HORAIRES_CORENTIN = {
+  1:"Chateau 10h00/19h00",  // Lundi    : 9h - 1h30 = 7.5h
+  2:"Chateau 10h00/19h00",  // Mardi    : 7.5h
+  3:"Chateau 10h00/19h00",  // Mercredi : 7.5h
+  4:"OFF",                   // Jeudi    : repos
+  5:"Chateau 10h00/19h00",  // Vendredi : 7.5h
+  6:"Chateau 10h00/19h30",  // Samedi   : 9.5h - 1h = 8.5h
+  0:"OFF",
+};
 
 const USERS = [
   {user:"Laetitia", pass:"Boutique2014!", role:"admin"},
@@ -115,7 +138,7 @@ const getWD = mon => Array.from({length:7},function(_,i){return addD(mon,i);});
 const parseH = function(val, jourNum) {
   if(!val) return 0;
   var up = val.trim().toUpperCase();
-  if(up==="OFF/FERIE"||up==="OFF/FERIE") return H_STD;
+  if(up==="OFF/FERIE"||up==="OFF/FÉRIÉ") return H_STD;
   var isAbs = ["OFF","CONGE","RTT","MALADIE","ABSENCE"].some(function(x){return up===x||up.startsWith(x+' ');});
   var isFT  = up.includes("FERIE TRAVAIL");
   if(isAbs && !isFT) return 0;
@@ -125,10 +148,15 @@ const parseH = function(val, jourNum) {
   var b = parseInt(mt[3])*60+parseInt(mt[4]);
   var diff = b-a;
   if(diff<=0) return 0;
-  var isCh = up.includes("CHATEAU") || up.includes("BLERE");
-  var isSam = jourNum===6;
-  var pause = 0;
-  if(diff>360){ pause = isCh?(isSam?60:90):60; }
+  var isCh   = up.includes("CHATEAU");
+  var isBlere = up.includes("BLERE");
+  var isSam  = jourNum===6;
+  var pause  = 0;
+  if(diff > 360) {
+    if(isCh)     pause = isSam ? 60 : 90; // Château : 1h sam, 1h30 lun-ven
+    else         pause = 60;              // Standard + Bléré : 1h
+    // Bléré shifts courts (lun/jeu 5h, sam 4.5h) : diff <= 360 donc pas de pause
+  }
   return Math.round((diff-pause)/60*10)/10;
 };
 
@@ -141,7 +169,7 @@ const cellBg = function(val, ei) {
   if(up.includes("CONGE")) return '#e8f8f0';
   if(up==="RTT") return '#e8f0ff';
   if(up==="MALADIE") return '#fde8e8';
-  if(up.includes("T-C")) return '#ede8ff';
+  if(up.includes("BLERE")||up.includes("BLÉRÉ")) return '#fce4ec';
   if(up.includes("BLERE")) return '#fce8ff';
   if(up.includes("TOURS")) return '#e8f8ee';
   if(up.includes("CHATEAU")) return '#fff8e1';
@@ -158,6 +186,7 @@ const cellTxt = function(val) {
   if(up.includes("CONGE")) return '#065f46';
   if(up==="RTT") return '#1e40af';
   if(up==="MALADIE") return '#991b1b';
+  if(up.includes("BLERE")||up.includes("BLÉRÉ")) return '#880e4f';
   if(up.includes("T-C")) return '#4c1d95';
   if(up.includes("BLERE")) return '#9333ea';
   if(up.includes("TOURS")) return '#14532d';
@@ -336,6 +365,20 @@ function App() {
     if(c&&c.val) return c;
     var cg=conges.find(function(g){return dStr>=g.debut&&dStr<=g.fin&&g.empId===empId&&g.statut==='valide';});
     if(cg) return {val:cg.type,hsupp:0,fromCg:true};
+    // Horaires fixes auto pour Mathieu et Corentin
+    var emp=employees.find(function(e){return e.id===empId;});
+    if(emp){
+      var d=new Date(dStr+'T12:00');
+      var jourNum=d.getDay();
+      if(emp.name==='Mathieu'){
+        var val=HORAIRES_MATHIEU[jourNum];
+        if(val&&val!=='OFF') return {val:val,hsupp:0,fixed:true};
+      }
+      if(emp.name==='Corentin'){
+        var val2=HORAIRES_CORENTIN[jourNum];
+        if(val2&&val2!=='OFF') return {val:val2,hsupp:0,fixed:true};
+      }
+    }
     return null;
   };
 
