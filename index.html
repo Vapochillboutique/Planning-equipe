@@ -342,7 +342,10 @@ function App(){
   };
 
   const openM=(empId,date,dayIdx)=>{
-    const k=dk(date),c=(cells[empId]||{})[k]||{},val=c.val||"";
+    const k=dk(date),c=(cells[empId]||{})[k]||{};
+    // Si pas de valeur manuelle, récupérer la valeur fixe pré-remplie
+    const cv=getCV(empId,k);
+    const val=c.val||(cv&&cv.fixed?cv.val:"")||"";
     const up=val.toUpperCase(),isFT=up.includes("FERIE TRAVAIL");
     setMFer(isFT);
     setMAbs(isFT?"":( ABS.find(a=>up.startsWith(a.toUpperCase()))||""));
@@ -411,7 +414,7 @@ function App(){
     const hh=cv?parseH(cv.val,d.getDay()):0;
     const up=(cv&&cv.val?cv.val:"").toUpperCase();
     const isFT=up.includes("FERIE TRAVAIL"),isOFF=up==="OFF";
-    const canClick=isA&&!(cv&&cv.fromCg)&&!(cv&&cv.fixed);
+    const canClick=isA&&!(cv&&cv.fromCg);
     return React.createElement("td",{
       key:emp.id,
       onClick:()=>canClick&&openM(emp.id,d,dayIdx),
@@ -424,7 +427,7 @@ function App(){
         cv.hsupp>0&&React.createElement("div",{style:{fontSize:mob?8:10,color:"#f59e0b",fontWeight:700}},"+"+cv.hsupp+"h supp"),
         isFT&&React.createElement("div",{style:{fontSize:mob?8:10,color:"#c2410c",fontWeight:700}},"x1.25="+Math.round(hh*1.25*10)/10+"h"),
         cv.fromCg&&React.createElement("div",{style:{fontSize:mob?7:9,color:"#888",fontStyle:"italic"}},"conge"),
-        cv.fixed&&React.createElement("div",{style:{fontSize:mob?7:9,color:"#aaa",fontStyle:"italic"}},"fixe")
+        cv.fixed&&React.createElement("div",{style:{fontSize:mob?7:9,color:isA?"#1a6ed8":"#aaa",fontStyle:"italic"}},isA?"✏️ modifiable":"fixe")
       ):React.createElement("div",{style:{color:"#ddd",fontSize:18}},isA?"+":"")
     );
   };
