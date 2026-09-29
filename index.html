@@ -1,893 +1,1813 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Planning Equipe</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<script type="module">
-import {initializeApp} from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import {getFirestore,doc,setDoc,onSnapshot,collection,deleteDoc} from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-const app=initializeApp({apiKey:"AIzaSyCz0t_IjyIkhj-HoluGMmMC4SWIY-aZgjc",authDomain:"planning-equipe-fcede.firebaseapp.com",projectId:"planning-equipe-fcede",storageBucket:"planning-equipe-fcede.firebasestorage.app",messagingSenderId:"620342264464",appId:"1:620342264464:web:d7ebdb359b9bdd97e0ce15"});
-const db=getFirestore(app);
-window.__fb={db,doc,setDoc,onSnapshot,collection,deleteDoc};
-window.__fbReady=true;
-window.dispatchEvent(new Event('fbReady'));
-</script>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lety</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
 <style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:#f5f6f8;font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;}
-input,select,button{font-family:inherit;outline:none;}
-::-webkit-scrollbar{width:5px;height:5px;}
-::-webkit-scrollbar-thumb{background:#ddd;border-radius:3px;}
-</style>
-</head>
-<body>
-<div id="root"></div>
-<script type="text/babel">
-
-const JOURS=["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
-const H_STD=7,H_SEM=35;
-const LIEUX=["Bureau","Chateau","T-C","Tours N","Blere","Reunion","Formation"];
-const LIEUX_D=["Bureau","Ch\u00e2teau","T-C","Tours N","Bl\u00e9r\u00e9","R\u00e9union","Formation"];
-const ABS=["OFF","Conge","RTT","Maladie","OFF/Ferie","Absence"];
-const ABS_D=["OFF","Cong\u00e9","RTT","Maladie","OFF/F\u00e9ri\u00e9","Absence"];
-const TCG=["Conge","RTT","Maladie","OFF/Ferie","Absence"];
-const TCG_D=["Cong\u00e9","RTT","Maladie","OFF/F\u00e9ri\u00e9","Absence"];
-const CGC={Conge:"#10b981",RTT:"#6366f1",Maladie:"#ef4444","OFF/Ferie":"#f59e0b",Absence:"#94a3b8"};
-const EACC=["#d63384","#1a6ed8","#d6530a","#1ab86b","#8b1ad6","#b8991a","#1ab0d6","#d61a1a"];
-const EBG=["#fdf0f8","#f0f5fe","#fdf5f0","#f0fef5","#f8f0fe","#fefdf0","#f0fcfe","#fef0f0"];
-const ea=i=>EACC[i%EACC.length];
-const eb=i=>EBG[i%EBG.length];
-
-const DEMP=[
-  {id:"e1",name:"Laetitia",hSem:35},{id:"e2",name:"Nicolas",hSem:35},
-  {id:"e3",name:"Charlotte",hSem:35},{id:"e4",name:"Marco",hSem:35},
-  {id:"e5",name:"Alan",hSem:35},{id:"e6",name:"Corentin",hSem:38.5},
-  {id:"e7",name:"Mathieu",hSem:38.5},{id:"e8",name:"Laura",hSem:35},
-];
-
-const USERS=[
-  {user:"Laetitia",pass:"Boutique2014!",role:"admin"},
-  {user:"Nicolas",pass:"12345",role:"lecteur"},
-  {user:"Charlotte",pass:"12345",role:"lecteur"},
-  {user:"Marco",pass:"12345",role:"lecteur"},
-  {user:"Alan",pass:"12345",role:"lecteur"},
-  {user:"Corentin",pass:"12345",role:"lecteur"},
-  {user:"Mathieu",pass:"12345",role:"lecteur"},
-  {user:"Laura",pass:"12345",role:"lecteur"},
-];
-
-const HM={1:"Blere 14h00/19h00",2:"Blere 10h00/19h00",3:"Blere 10h00/19h00",4:"Blere 14h00/19h00",5:"Blere 10h00/19h00",6:"Blere 10h00/14h30",0:null};
-const HC={1:"Chateau 10h00/19h00",2:"Chateau 10h00/19h00",3:"Chateau 10h00/19h00",4:"OFF",5:"Chateau 10h00/19h00",6:"Chateau 10h00/19h30",0:null};
-
-const SLOTS=[];
-for(let h=10;h<=19;h++){const mx=h===19?30:45;for(let m=0;m<=mx;m+=15)SLOTS.push(String(h).padStart(2,"0")+"h"+(m===0?"00":String(m)));}
-
-const pad=n=>String(n).padStart(2,"0");
-const dk=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
-const isWE=d=>d.getDay()===0;
-const addD=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r;};
-const getMon=d=>{const r=new Date(d);const day=r.getDay();r.setDate(r.getDate()+(day===0?-6:1-day));r.setHours(0,0,0,0);return r;};
-const frD=d=>d.toLocaleDateString("fr-FR",{day:"numeric",month:"long"});
-const frDC=d=>d.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
-const frDS=s=>new Date(s+"T12:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
-const frM=(y,m)=>new Date(y,m,1).toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
-const getWD=mon=>Array.from({length:7},(_,i)=>addD(mon,i));
-
-const jouv=(d1,d2)=>{
-  let d=new Date(d1),n=0;
-  while(d<=d2){if(d.getDay()!==0)n++;d.setDate(d.getDate()+1);}
-  return n;
-};
-
-const parseH=(val,jn)=>{
-  if(!val)return 0;
-  const up=val.trim().toUpperCase();
-  if(up==="OFF/FERIE"||up==="OFF/F\u00c9RI\u00c9")return H_STD;
-  const isA=["OFF","CONGE","CONG\u00c9","RTT","MALADIE","ABSENCE"].some(x=>up===x||up.startsWith(x+" "));
-  const isFT=up.includes("FERIE TRAVAIL");
-  if(isA&&!isFT)return 0;
-  const mt=val.match(/(\d{1,2})[hH](\d{2})\s*[\/\-]\s*(\d{1,2})[hH](\d{2})/i);
-  if(!mt)return 0;
-  const a=parseInt(mt[1])*60+parseInt(mt[2]);
-  const b=parseInt(mt[3])*60+parseInt(mt[4]);
-  const diff=b-a;
-  if(diff<=0)return 0;
-  const isCh=up.includes("CHATEAU");
-  const isSam=jn===6;
-  let pause=0;
-  if(diff>360)pause=isCh?(isSam?60:90):60;
-  return Math.round((diff-pause)/60*10)/10;
-};
-
-const cBg=(val,ei)=>{
-  if(!val)return"#fff";
-  const up=val.trim().toUpperCase();
-  if(up==="OFF")return"#f8f8f8";
-  if(up.includes("FERIE TRAVAIL"))return"#fff0e0";
-  if(up.includes("FERIE")||up.includes("F\u00c9RI\u00c9"))return"#fff8e1";
-  if(up.includes("CONGE")||up.includes("CONG\u00c9"))return"#e8f8f0";
-  if(up==="RTT")return"#e8f0ff";
-  if(up==="MALADIE")return"#fde8e8";
-  if(up.includes("BLERE")||up.includes("BL\u00c9R\u00c9"))return"#fce4ec";
-  if(up.includes("T-C"))return"#ede8ff";
-  if(up.includes("TOURS"))return"#e8f8ee";
-  if(up.includes("CHATEAU")||up.includes("CH\u00c2TEAU"))return"#fff8e1";
-  return eb(ei);
-};
-
-const cTxt=val=>{
-  if(!val)return"#ccc";
-  const up=val.trim().toUpperCase();
-  if(up==="OFF")return"#aaa";
-  if(up.includes("FERIE TRAVAIL"))return"#c2410c";
-  if(up.includes("FERIE")||up.includes("F\u00c9RI\u00c9"))return"#b45309";
-  if(up.includes("CONGE")||up.includes("CONG\u00c9"))return"#065f46";
-  if(up==="RTT")return"#1e40af";
-  if(up==="MALADIE")return"#991b1b";
-  if(up.includes("BLERE")||up.includes("BL\u00c9R\u00c9"))return"#880e4f";
-  if(up.includes("T-C"))return"#4c1d95";
-  if(up.includes("TOURS"))return"#14532d";
-  if(up.includes("CHATEAU")||up.includes("CH\u00c2TEAU"))return"#78350f";
-  return"#1a1a2e";
-};
-
-const getMW=(y,m)=>{
-  const weeks=[],last=new Date(y,m+1,0);
-  let mon=getMon(new Date(y,m,1));
-  while(mon<=last){
-    const wd=getWD(mon).filter(d=>d.getMonth()===m&&!isWE(d));
-    if(wd.length)weeks.push({mon:new Date(mon),wd});
-    mon=addD(mon,7);
+:root{
+  --bg:#FFFFFF; --surface:#F7F7F7; --card:#FFFFFF; --ink:#222222; --muted:#6A6A6A; --line:#DDDDDD;
+  --accent:#D92C4A; --accent2:#B3206A; --accent-ink:#FFFFFF; --accent-soft:#FFEBEE;
+  --s1:#FFE3E7; --s1-line:#D92C4A;
+  --s2:#FFF0C7; --s2-line:#C08A12;
+  --s3:#DCEEFC; --s3-line:#2D7FC1;
+  --leave:#EBEBEB;
+  --warn-bg:#FFF0C7; --warn-ink:#6E4B00;
+  --ok-bg:#DDF4E6; --ok-ink:#0F5E38;
+  --no-bg:#EDEDED; --no-ink:#555555;
+  --shadow:0 6px 24px rgba(0,0,0,.08);
+  --font:"Figtree","Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121212; --surface:#1C1C1C; --card:#1A1A1A; --ink:#F3F3F3; --muted:#A6A6A6; --line:#333333;
+    --accent:#FF5A73; --accent2:#D6407F; --accent-ink:#2A0A10; --accent-soft:#3A1C23;
+    --s1:#4A2029; --s1-line:#FF7D8E;
+    --s2:#4A3B17; --s2-line:#E9B24F;
+    --s3:#1B3350; --s3-line:#6CA6EA;
+    --leave:#262626;
+    --warn-bg:#4A3B17; --warn-ink:#F3D28A;
+    --ok-bg:#14382A; --ok-ink:#8FE0B4;
+    --no-bg:#2C2C2C; --no-ink:#B5B5B5;
+    --shadow:0 6px 24px rgba(0,0,0,.5);
   }
-  return weeks;
-};
+}
+:root[data-theme="dark"]{
+  --bg:#121212; --surface:#1C1C1C; --card:#1A1A1A; --ink:#F3F3F3; --muted:#A6A6A6; --line:#333333;
+  --accent:#FF5A73; --accent2:#D6407F; --accent-ink:#2A0A10; --accent-soft:#3A1C23;
+  --s1:#4A2029; --s1-line:#FF7D8E;
+  --s2:#4A3B17; --s2-line:#E9B24F;
+  --s3:#1B3350; --s3-line:#6CA6EA;
+  --leave:#262626;
+  --warn-bg:#4A3B17; --warn-ink:#F3D28A;
+  --ok-bg:#14382A; --ok-ink:#8FE0B4;
+  --no-bg:#2C2C2C; --no-ink:#B5B5B5;
+  --shadow:0 6px 24px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.55;padding-inline:20px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin-inline:auto}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:8px}
+h1,h2,h3{line-height:1.1;letter-spacing:-.02em;text-wrap:balance;margin:0}
+p{margin:0}
+button{font-family:inherit}
+.tnum{font-variant-numeric:tabular-nums}
 
-const SK="planSess4";
-const svS=s=>{try{localStorage.setItem(SK,JSON.stringify(s));}catch(e){}};
-const ldS=()=>{try{const v=localStorage.getItem(SK);if(v)return JSON.parse(v);}catch(e){}return null;};
-const clS=()=>{try{localStorage.removeItem(SK);}catch(e){}};
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);margin-inline:-20px;padding-inline:20px;border-bottom:1px solid var(--line)}
+.nav{max-width:1180px;margin-inline:auto;display:flex;align-items:center;justify-content:space-between;gap:16px;height:76px}
+.logo{font-weight:800;font-size:30px;letter-spacing:-.04em;text-decoration:none;color:var(--accent)}
+.navpill{display:flex;border:1px solid var(--line);border-radius:999px;box-shadow:0 1px 6px rgba(0,0,0,.08);padding:5px}
+.navpill a{text-decoration:none;font-weight:600;font-size:14.5px;padding:9px 18px;border-radius:999px}
+.navpill a:hover{background:var(--surface)}
+.navr{display:flex;gap:8px;align-items:center}
+.btn{display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:16px;padding:13px 24px;border-radius:12px;text-decoration:none;border:1px solid var(--ink);color:var(--ink);background:transparent;cursor:pointer;line-height:1.2}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(.94)}
+.btn:not(.primary):hover{background:var(--surface)}
+.btn.sm{padding:9px 16px;font-size:14.5px;border-radius:999px}
+.btn.ghost{border-color:transparent}
+.btn[disabled]{opacity:.45;cursor:default}
+@media (max-width:820px){.navpill{display:none}}
+@media (max-width:420px){.navr .ghost{display:none}}
 
-function Login({onLogin}){
-  const [u,setU]=React.useState("");
-  const [p,setP]=React.useState("");
-  const [err,setErr]=React.useState("");
-  const [show,setShow]=React.useState(false);
-  const go=()=>{
-    const f=USERS.find(x=>x.user.toLowerCase()===u.trim().toLowerCase()&&x.pass===p.trim());
-    if(f){svS({user:f.user,role:f.role});onLogin({user:f.user,role:f.role});}
-    else{setErr("Identifiant ou mot de passe incorrect.");setTimeout(()=>setErr(""),3000);}
-  };
-  const sty={width:"100%",border:"1.5px solid #e5e7eb",borderRadius:10,padding:"10px 13px",fontSize:14,color:"#1a1a2e",background:"#f8f9fa"};
-  return React.createElement("div",{style:{minHeight:"100vh",background:"linear-gradient(135deg,#1a1a2e,#0f3460)",display:"flex",alignItems:"center",justifyContent:"center"}},
-    React.createElement("div",{style:{background:"#fff",borderRadius:20,padding:40,width:360,maxWidth:"calc(100vw - 32px)",boxShadow:"0 30px 80px rgba(0,0,0,0.3)"}},
-      React.createElement("div",{style:{textAlign:"center",marginBottom:28}},
-        React.createElement("div",{style:{width:56,height:56,background:"linear-gradient(135deg,#1a6ed8,#8b1ad6)",borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,margin:"0 auto 12px"}},"📅"),
-        React.createElement("div",{style:{fontSize:20,fontWeight:800,color:"#1a1a2e"}},"Planning Equipe"),
-        React.createElement("div",{style:{fontSize:12,color:"#aaa",marginTop:3}},"Connectez-vous pour continuer")
-      ),
-      React.createElement("div",{style:{marginBottom:12}},
-        React.createElement("div",{style:{fontSize:11,fontWeight:700,color:"#888",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:5}},"Identifiant"),
-        React.createElement("input",{value:u,onChange:e=>setU(e.target.value),onKeyDown:e=>e.key==="Enter"&&go(),placeholder:"Votre prenom",autoFocus:true,style:sty})
-      ),
-      React.createElement("div",{style:{marginBottom:18}},
-        React.createElement("div",{style:{fontSize:11,fontWeight:700,color:"#888",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:5}},"Mot de passe"),
-        React.createElement("div",{style:{position:"relative"}},
-          React.createElement("input",{type:show?"text":"password",value:p,onChange:e=>setP(e.target.value),onKeyDown:e=>e.key==="Enter"&&go(),placeholder:"••••••••",style:{...sty,padding:"10px 38px 10px 13px"}}),
-          React.createElement("button",{onClick:()=>setShow(x=>!x),style:{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:15,color:"#aaa"}},show?"👁":"🔒")
-        )
-      ),
-      err&&React.createElement("div",{style:{background:"#fde8e8",border:"1px solid #fca5a5",borderRadius:8,padding:"9px 13px",color:"#dc2626",fontSize:12,fontWeight:600,marginBottom:14,textAlign:"center"}},err),
-      React.createElement("button",{onClick:go,style:{width:"100%",padding:"12px 0",borderRadius:10,border:"none",background:"linear-gradient(135deg,#1a6ed8,#8b1ad6)",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer"}},"Se connecter →"),
-      React.createElement("div",{style:{textAlign:"center",marginTop:16,fontSize:11,color:"#ccc"}},"🔒 Acces securise")
-    )
-  );
+/* hero */
+.hero{padding-block:64px 24px;text-align:center}
+.badge{display:inline-block;font-weight:600;font-size:14px;padding:7px 14px;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
+.hero h1{font-size:clamp(36px,6vw,68px);font-weight:800;margin:22px auto 0;max-width:15ch}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero .lead{font-size:clamp(18px,2vw,21px);color:var(--muted);max-width:58ch;margin:22px auto 0}
+.pill{display:flex;align-items:center;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:999px;box-shadow:var(--shadow);max-width:740px;margin:36px auto 0;padding:8px}
+.pill:focus-within{border-color:var(--ink)}
+.seg{flex:1;padding:8px 26px;min-width:0}
+.seg+.seg{border-left:1px solid var(--line)}
+.seg label,.seg .l{display:block;font-size:12.5px;font-weight:700}
+.seg input{border:0;background:transparent;font:inherit;font-size:16px;color:var(--ink);width:100%;padding:0;outline:none}
+.seg strong{display:block;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill .go{border-radius:999px;padding:0 26px;height:54px;flex:none}
+@media (max-width:600px){
+  .pill{flex-direction:column;align-items:stretch;border-radius:24px}
+  .seg{padding:10px 18px}
+  .seg+.seg{border-left:0;border-top:1px solid var(--line)}
+  .pill .go{margin-top:6px}
 }
 
-function App(){
-  const today=new Date();
-  const [session,setSession]=React.useState(null);
-  const [sesOk,setSesOk]=React.useState(false);
-  const [fbOk,setFbOk]=React.useState(false);
-  const [sync,setSync]=React.useState("Connexion...");
-  const [emps,setEmps]=React.useState(DEMP);
-  const [cells,setCells]=React.useState({});
-  const [conges,setConges]=React.useState([]);
-  const [view,setView]=React.useState("planning");
-  const [mon,setMon]=React.useState(getMon(today));
-  const [cgM,setCgM]=React.useState(today.getMonth());
-  const [cgY,setCgY]=React.useState(today.getFullYear());
-  const [recM,setRecM]=React.useState(today.getMonth());
-  const [recY,setRecY]=React.useState(today.getFullYear());
-  const [mob,setMob]=React.useState(window.innerWidth<=640);
-  const [modal,setModal]=React.useState(null);
-  const [mLieu,setMLieu]=React.useState("");
-  const [mAbs,setMAbs]=React.useState("");
-  const [mDeb,setMDeb]=React.useState("");
-  const [mFin,setMFin]=React.useState("");
-  const [mHS,setMHS]=React.useState(0);
-  const [mFer,setMFer]=React.useState(false);
-  const [cgEmp,setCgEmp]=React.useState("");
-  const [cgTyp,setCgTyp]=React.useState("Conge");
-  const [cgDeb,setCgDeb]=React.useState("");
-  const [cgFin,setCgFin]=React.useState("");
-  const [cgNot,setCgNot]=React.useState("");
-  const [selS,setSelS]=React.useState(null);
-  const [selE,setSelE]=React.useState(null);
-  const [hovD,setHovD]=React.useState(null);
-  const [newN,setNewN]=React.useState("");
+/* demo */
+.demo{margin-top:48px;text-align:center}
+.switch{display:inline-flex;background:var(--surface);border-radius:999px;padding:5px;border:1px solid var(--line);flex-wrap:wrap;justify-content:center}
+.switch button{border:0;background:transparent;font-weight:600;font-size:15px;padding:10px 20px;border-radius:999px;cursor:pointer;color:var(--muted)}
+.switch button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 6px rgba(0,0,0,.16)}
+.hint{font-size:14px;color:var(--muted);margin-top:10px}
+.app{display:grid;grid-template-columns:230px 1fr;background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:0 30px 70px -30px rgba(0,0,0,.35);overflow:hidden;text-align:left;min-height:560px;margin-top:18px}
+.side{padding:18px 14px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px;background:var(--surface)}
+.me{display:flex;gap:10px;align-items:center;padding:6px 10px 16px}
+.av{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:15px}
+.me b{display:block;font-size:15px;line-height:1.2}
+.me small{color:var(--muted);font-size:13px}
+.nv{border:0;background:transparent;font-weight:600;font-size:15px;text-align:left;padding:11px 12px;border-radius:12px;cursor:pointer;color:var(--ink);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.nv:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.nv.on{background:var(--card);box-shadow:0 1px 6px rgba(0,0,0,.12)}
+.nv em{font-style:normal;background:var(--accent);color:var(--accent-ink);font-size:12px;padding:1px 8px;border-radius:999px}
+.main{padding:26px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.ph h3{font-size:24px;font-weight:700}
+.sub{color:var(--muted);font-size:14.5px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-bottom:12px}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:12px;height:12px;border-radius:4px;display:inline-block;border-left:3px solid}
+.scroll-x{overflow-x:auto;border:1px solid var(--line);border-radius:16px}
+.pl{display:grid;grid-template-columns:112px repeat(7,minmax(92px,1fr));min-width:780px}
+.pl>div{padding:7px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);min-height:54px;display:flex;align-items:center}
+.pl>div:nth-child(8n){border-right:0}
+.pl>div:nth-last-child(-n+8){border-bottom:0}
+.pl .h{font-size:12.5px;font-weight:700;color:var(--muted);min-height:40px;background:var(--surface)}
+.pl .who{font-weight:600;font-size:15px;gap:8px}
+.pl .who i{width:26px;height:26px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-style:normal;font-size:12px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+.shift{width:100%;font-size:12.5px;font-weight:600;padding:6px 8px;border-radius:8px;border-left:3px solid;line-height:1.25}
+.shift small{display:block;font-size:11.5px;font-weight:500;color:var(--muted)}
+.shift.a{background:var(--s1);border-color:var(--s1-line)}
+.shift.b{background:var(--s2);border-color:var(--s2-line)}
+.shift.c{background:var(--s3);border-color:var(--s3-line)}
+.shift.off{background:repeating-linear-gradient(135deg,var(--leave) 0 6px,transparent 6px 12px);border-color:var(--line);color:var(--muted);text-align:center;border-left-width:1px;font-weight:500}
+.dr{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+.dr:first-of-type{border-top:0}
+.dr .d{font-weight:600}
+.dr .rest{color:var(--muted);font-size:14.5px}
+.dr .shift{max-width:280px}
 
-  const isA=session&&session.role==="admin";
-  const hSem=id=>{const e=emps.find(x=>x.id===id);return e&&e.hSem?e.hSem:35;};
+.eq{display:grid;grid-template-columns:240px 1fr;gap:20px}
+.pp{display:flex;align-items:center;gap:10px;width:100%;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:10px 12px;cursor:pointer;text-align:left;color:var(--ink);margin-bottom:8px}
+.pp.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.pp b{display:block;font-size:15px;line-height:1.2}
+.pp small{color:var(--muted);font-size:13px}
+.fiche{background:var(--surface);border-radius:18px;padding:22px}
+.fiche h4{margin:0 0 12px;font-size:20px;font-weight:700}
+.fiche dl{margin:0}
+.fiche dl>div{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+.fiche dt{color:var(--muted);font-size:14.5px}
+.fiche dd{margin:0;font-weight:600;font-size:15px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.chip{background:var(--accent-soft);font-size:13px;font-weight:600;padding:4px 10px;border-radius:999px}
 
-  React.useEffect(()=>{const s=ldS();if(s)setSession(s);setSesOk(true);},[]);
-  React.useEffect(()=>{
-    const h=()=>setMob(window.innerWidth<=640);
-    window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);
-  },[]);
-  React.useEffect(()=>{
-    if(window.__fbReady){setFbOk(true);return;}
-    const h=()=>setFbOk(true);
-    window.addEventListener("fbReady",h);return()=>window.removeEventListener("fbReady",h);
-  },[]);
+.lv{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 18px;border:1px solid var(--line);border-radius:16px;margin-bottom:10px}
+.lv b{display:block}
+.lv .acts{display:flex;gap:8px;align-items:center}
+.tag{font-size:12.5px;font-weight:700;padding:4px 11px;border-radius:999px}
+.tag.p{background:var(--warn-bg);color:var(--warn-ink)}
+.tag.ok{background:var(--ok-bg);color:var(--ok-ink)}
+.tag.no{background:var(--no-bg);color:var(--no-ink)}
 
-  React.useEffect(()=>{
-    if(!fbOk||!session)return;
-    const {db,onSnapshot,collection:col,doc}=window.__fb;
-    const u1=onSnapshot(doc(db,"planning","cells"),snap=>{if(snap.exists())setCells(snap.data().data||{});setSync("Synchronise");},()=>setSync("Erreur"));
-    const u2=onSnapshot(col(db,"conges"),snap=>{
-      try{setConges(snap.docs.map(d=>{const x=d.data();return{id:d.id,empId:x.empId||"",type:x.type||"Conge",debut:x.debut||"",fin:x.fin||"",note:x.note||"",statut:x.statut||"valide",demandeLe:x.demandeLe||""};}).filter(g=>g.debut&&g.fin&&g.empId));}catch(e){}
-    });
-    const u3=onSnapshot(doc(db,"planning","employees"),snap=>{
-      if(snap.exists()&&snap.data().list&&snap.data().list.length>0){
-        const fl=snap.data().list;
-        setEmps(fl.map(e=>{const d=DEMP.find(x=>x.name===e.name||x.id===e.id);return{...e,hSem:e.hSem||(d&&d.hSem)||35};}));
-      }
-    });
-    return()=>{u1();u2();u3();};
-  },[fbOk,session]);
+.cw{display:grid;grid-template-columns:minmax(0,340px) 1fr;gap:28px;align-items:start}
+.cal-h{font-weight:700;font-size:18px;margin-bottom:10px}
+.cg{display:grid;grid-template-columns:repeat(7,1fr);row-gap:4px;text-align:center}
+.cg .dn{font-size:12px;font-weight:700;color:var(--muted);padding-bottom:6px}
+.dy{border:0;background:transparent;font-size:15px;padding:10px 0;cursor:pointer;border-radius:999px;color:var(--ink);font-variant-numeric:tabular-nums}
+.dy:hover:not(:disabled){box-shadow:inset 0 0 0 1.5px var(--ink)}
+.dy:disabled{color:var(--muted);opacity:.4;cursor:default}
+.dy.in{background:var(--accent-soft);border-radius:0}
+.dy.st,.dy.en{background:var(--accent);color:var(--accent-ink);font-weight:700;border-radius:999px}
+.sum{background:var(--surface);border-radius:18px;padding:22px}
+.sum .big{font-size:38px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.sum .row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);font-size:15px}
+.sum .row span:first-child{color:var(--muted)}
+.note{background:var(--accent-soft);border-radius:14px;padding:14px 16px;margin-top:14px;font-size:15px}
+.note button{border:0;background:none;color:var(--accent);font-weight:700;cursor:pointer;padding:0;font-size:15px;text-decoration:underline}
 
-  const svC=async nc=>{
-    if(!fbOk)return;
-    const {db,doc,setDoc}=window.__fb;
-    setSync("Sauvegarde...");
-    try{await setDoc(doc(db,"planning","cells"),{data:nc});setSync("Synchronise");}catch(e){setSync("Erreur");}
-  };
-  const svE=async list=>{if(!fbOk)return;const {db,doc,setDoc}=window.__fb;try{await setDoc(doc(db,"planning","employees"),{list});}catch(e){}};
+.msg{display:grid;grid-template-columns:210px 1fr;border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.threads{border-right:1px solid var(--line);padding:8px;display:flex;flex-direction:column;gap:2px;background:var(--surface)}
+.th{border:0;background:transparent;text-align:left;padding:11px 12px;border-radius:12px;cursor:pointer;font-weight:600;font-size:15px;color:var(--ink)}
+.th small{display:block;font-weight:400;color:var(--muted);font-size:13px}
+.th.on{background:var(--card);box-shadow:0 1px 6px rgba(0,0,0,.12)}
+.conv{display:flex;flex-direction:column;min-width:0}
+.conv-h{padding:14px 18px;border-bottom:1px solid var(--line);font-weight:700}
+.bubbles{overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:10px;height:310px}
+.bb{max-width:80%;padding:10px 15px;border-radius:20px;background:var(--surface);align-self:flex-start;font-size:15px;line-height:1.4;overflow-wrap:anywhere}
+.bb.me{align-self:flex-end;background:var(--accent);color:var(--accent-ink)}
+.bb small{display:block;font-size:12px;opacity:.75;margin-bottom:2px}
+.compose{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line)}
+.compose input{flex:1;min-width:0;border:1px solid var(--line);border-radius:999px;padding:11px 18px;font:inherit;font-size:15px;background:var(--card);color:var(--ink)}
+.compose input:focus{outline:none;border-color:var(--ink)}
 
-  const addCgA=async()=>{
-    if(!cgEmp||!cgDeb||!cgFin||!fbOk)return;
-    const {db,doc,setDoc}=window.__fb;
-    await setDoc(doc(db,"conges","cg"+Date.now()),{empId:cgEmp,type:cgTyp,debut:cgDeb,fin:cgFin,note:cgNot,statut:"valide",demandeLe:new Date().toISOString()});
-    setCgDeb("");setCgFin("");setCgNot("");setSelS(null);setSelE(null);
-  };
-  const demCg=async()=>{
-    if(!cgDeb||!cgFin||!fbOk)return;
-    const deb=new Date(cgDeb+"T12:00"),minD=new Date();minD.setMonth(minD.getMonth()+1);
-    if(deb<minD){alert("Les conges doivent etre demandes au moins 1 mois a l avance. Date minimum : "+minD.toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"}));return;}
-    const {db,doc,setDoc}=window.__fb;
-    const emp=emps.find(e=>e.name===session.user);
-    if(!emp)return;
-    await setDoc(doc(db,"conges","cg"+Date.now()),{empId:emp.id,type:cgTyp,debut:cgDeb,fin:cgFin,note:cgNot,statut:"attente",demandeLe:new Date().toISOString()});
-    setCgDeb("");setCgFin("");setCgNot("");setSelS(null);setSelE(null);
-  };
-  const valCg=async id=>{
-    if(!fbOk)return;
-    const {db,doc,setDoc}=window.__fb;
-    const cg=conges.find(g=>g.id===id);if(!cg)return;
-    const {id:_,...data}=cg;
-    try{await setDoc(doc(db,"conges",id),{...data,statut:"valide"});}catch(e){}
-  };
-  const refCg=async id=>{
-    if(!fbOk)return;
-    const {db,doc,setDoc}=window.__fb;
-    const cg=conges.find(g=>g.id===id);if(!cg)return;
-    const {id:_,...data}=cg;
-    try{await setDoc(doc(db,"conges",id),{...data,statut:"refuse"});}catch(e){}
-  };
-  const delCg=async id=>{if(!fbOk)return;const {db,doc,deleteDoc}=window.__fb;try{await deleteDoc(doc(db,"conges",id));}catch(e){}};
-
-  const getCV=(empId,dStr)=>{
-    const c=(cells[empId]||{})[dStr];if(c&&c.val)return c;
-    const cg=conges.find(g=>dStr>=g.debut&&dStr<=g.fin&&g.empId===empId&&g.statut==="valide");
-    if(cg)return{val:cg.type,hsupp:0,fromCg:true};
-    const emp=emps.find(e=>e.id===empId);
-    if(emp){
-      const d=new Date(dStr+"T12:00"),jn=d.getDay();
-      if(emp.name==="Mathieu"&&HM[jn])return{val:HM[jn],hsupp:0,fixed:true};
-      if(emp.name==="Corentin"&&HC[jn]&&HC[jn]!=="OFF")return{val:HC[jn],hsupp:0,fixed:true};
-    }
-    return null;
-  };
-
-  const wkStats=(empId,wDays)=>{
-    const hs=hSem(empId);let h=0,s=0,hf=0;
-    wDays.forEach(d=>{
-      const cv=getCV(empId,dk(d));if(!cv)return;
-      const up=(cv.val||"").toUpperCase(),hh=parseH(cv.val,d.getDay());
-      if(up.includes("FERIE TRAVAIL"))hf+=Math.round(hh*1.25*10)/10;
-      else if(up!=="OFF"){h+=hh;if(cv.hsupp)s+=Number(cv.hsupp);}
-    });
-    const tot=Math.round((h+s+hf)*10)/10;
-    return{h:Math.round(h*10)/10,s,hf,tot,hs,diff:Math.round((tot-hs)*10)/10};
-  };
-
-  const mStats=(empId,y,m)=>{
-    const hs=hSem(empId),hj=Math.round(hs/5*10)/10;
-    const d=new Date(y,m,1);
-    let hT=0,hS=0,hFB=0,hFM=0,cpJ=0,rJ=0,mJ=0,fJ=0,ftJ=0,jo=0;
-    while(d.getMonth()===m){
-      if(!isWE(d))jo++;
-      const cv=getCV(empId,dk(d));
-      if(cv){
-        const up=(cv.val||"").toUpperCase(),hh=parseH(cv.val,d.getDay());
-        if(up.includes("FERIE TRAVAIL")){ftJ++;hFB+=hh;hFM+=Math.round(hh*1.25*10)/10;}
-        else if(up==="OFF/FERIE"||up==="OFF/F\u00c9RI\u00c9"){fJ++;hT+=hj;}
-        else if(up!=="OFF"){
-          hT+=hh;if(cv.hsupp)hS+=Number(cv.hsupp);
-          if(up.includes("CONGE")||up.includes("CONG\u00c9"))cpJ++;
-          else if(up==="RTT")rJ++;
-          else if(up==="MALADIE")mJ++;
-        }
-      }
-      d.setDate(d.getDate()+1);
-    }
-    hT=Math.round(hT*10)/10;hFB=Math.round(hFB*10)/10;hFM=Math.round(hFM*10)/10;
-    const nbS=Math.round(jo/6*10)/10,hTh=Math.round(nbS*hs*10)/10;
-    const hTot=Math.round((hT+hS+hFM)*10)/10,ecart=Math.round((hTot-hTh)*10)/10;
-    return{hT,hS,hFB,hFM,hTh,hTot,ecart,cpJ,rJ,mJ,fJ,ftJ,jo,hs,hj};
-  };
-
-  const openM=(empId,date,dayIdx)=>{
-    const k=dk(date),c=(cells[empId]||{})[k]||{};
-    // Si pas de valeur manuelle, récupérer la valeur fixe pré-remplie
-    const cv=getCV(empId,k);
-    const val=c.val||(cv&&cv.fixed?cv.val:"")||"";
-    const up=val.toUpperCase(),isFT=up.includes("FERIE TRAVAIL");
-    setMFer(isFT);
-    setMAbs(isFT?"":( ABS.find(a=>up.startsWith(a.toUpperCase()))||""));
-    setMLieu(isFT?"":( LIEUX.find(l=>up.startsWith(l.toUpperCase()))||""));
-    const mt=val.match(/(\d{1,2})[hH](\d{2})\s*[\/\-]\s*(\d{1,2})[hH](\d{2})/i);
-    setMDeb(mt?mt[1]+"h"+mt[2]:"");setMFin(mt?mt[3]+"h"+mt[4]:"");
-    setMHS(c.hsupp||0);setModal({empId,date,k,dayIdx});
-  };
-
-  const svM=async()=>{
-    if(!modal)return;
-    const {empId,k}=modal;
-    let val="";
-    if(mFer&&mDeb&&mFin)val="Ferie travaille "+mDeb+"/"+mFin;
-    else if(mAbs)val=mAbs;
-    else if(mDeb&&mFin)val=mLieu?(mLieu+" "+mDeb+"/"+mFin):(mDeb+"/"+mFin);
-    else if(mLieu)val=mLieu;
-    const nc={...cells,[empId]:{...(cells[empId]||{})}};
-    if(val||Number(mHS)>0)nc[empId][k]={val,hsupp:Number(mHS)||0};
-    else delete nc[empId][k];
-    setCells(nc);await svC(nc);setModal(null);
-  };
-
-  const clM=async()=>{
-    if(!modal)return;
-    const {empId,k}=modal;
-    const nc={...cells,[empId]:{...(cells[empId]||{})}};
-    delete nc[empId][k];setCells(nc);await svC(nc);
-    setMLieu("");setMAbs("");setMDeb("");setMFin("");setMHS(0);setMFer(false);setModal(null);
-  };
-
-  const addE=()=>{if(!newN.trim())return;const l=[...emps,{id:"e"+Date.now(),name:newN.trim(),hSem:35}];setEmps(l);svE(l);setNewN("");};
-
-  const expR=()=>{
-    const sep="============================================================";
-    let txt=sep+"\n  COMPTE RENDU - "+frM(recY,recM).toUpperCase()+"\n"+sep+"\n\n";
-    const ve=isA?emps:emps.filter(e=>e.name===session.user);
-    ve.forEach(emp=>{
-      const s=mStats(emp.id,recY,recM);
-      txt+="----\n  "+emp.name.toUpperCase()+" (contrat "+s.hs+"h/sem)\n----\n";
-      txt+="  Theorique : "+s.hTh+"h\n  Travaillees: "+s.hT+"h\n";
-      if(s.hS>0)txt+="  H.supp   : +"+s.hS+"h\n";
-      if(s.ftJ>0)txt+="  Feries   : "+s.ftJ+"j - "+s.hFB+"h x1.25="+s.hFM+"h\n";
-      txt+="  TOTAL    : "+s.hTot+"h\n  Ecart    : "+(s.ecart===0?"Parfait":(s.ecart>0?"+"+s.ecart+"h":s.ecart+"h"))+"\n";
-      txt+="  CP:"+s.cpJ+"j RTT:"+s.rJ+"j Maladie:"+s.mJ+"j\n\n";
-    });
-    const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");a.href=url;a.download="Compte_rendu.txt";a.click();URL.revokeObjectURL(url);
-  };
-
-  const bs={padding:"7px 14px",borderRadius:8,border:"1px solid #e0e0e0",background:"#fff",color:"#555",fontWeight:600,cursor:"pointer",fontSize:13};
-  const lb={display:"block",fontSize:11,fontWeight:700,color:"#888",textTransform:"uppercase",letterSpacing:"0.4px",marginBottom:5};
-  const ip={width:"100%",border:"1.5px solid #e5e7eb",borderRadius:9,padding:"9px 11px",fontSize:13,color:"#1a1a2e",background:"#f8f9fa",boxSizing:"border-box"};
-  const tdS={padding:"7px 10px",fontSize:12,color:"#444",verticalAlign:"middle"};
-
-  const NB=(v,label)=>React.createElement("button",{
-    onClick:()=>setView(v),
-    style:{padding:mob?"7px 10px":"7px 14px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,whiteSpace:"nowrap",
-      background:view===v?"#1a6ed8":"#fff",color:view===v?"#fff":"#555",border:view===v?"1px solid #1a6ed8":"1px solid #e0e0e0"}
-  },label);
-
-  const renderCell=(emp,ei,d,dayIdx)=>{
-    const k=dk(d),cv=getCV(emp.id,k);
-    const bg=cBg(cv?cv.val:"",ei),tc=cTxt(cv?cv.val:"");
-    const hh=cv?parseH(cv.val,d.getDay()):0;
-    const up=(cv&&cv.val?cv.val:"").toUpperCase();
-    const isFT=up.includes("FERIE TRAVAIL"),isOFF=up==="OFF";
-    const canClick=isA&&!(cv&&cv.fromCg);
-    return React.createElement("td",{
-      key:emp.id,
-      onClick:()=>canClick&&openM(emp.id,d,dayIdx),
-      style:{padding:"6px 8px",borderRight:"1px solid #f0f0f0",background:cv&&cv.val?(isOFF?"#f8f8f8":bg):"#fff",cursor:canClick?"pointer":"default",verticalAlign:"middle",textAlign:"center",minWidth:mob?70:130}
-    },
-      cv&&cv.val?React.createElement("div",{style:{padding:mob?"3px 4px":"6px 8px",borderRadius:8,background:isOFF?"#f8f8f8":bg}},
-        React.createElement("div",{style:{fontWeight:700,fontSize:mob?9:13,color:isOFF?"#aaa":tc,whiteSpace:"nowrap"}},cv.val),
-        up==="OFF/FERIE"&&React.createElement("div",{style:{fontSize:mob?8:10,color:"#b45309"}},"7h payees"),
-        hh>0&&up!=="OFF/FERIE"&&!isOFF&&React.createElement("div",{style:{fontSize:mob?8:10,color:"#aaa"}},hh+"h"),
-        cv.hsupp>0&&React.createElement("div",{style:{fontSize:mob?8:10,color:"#f59e0b",fontWeight:700}},"+"+cv.hsupp+"h supp"),
-        isFT&&React.createElement("div",{style:{fontSize:mob?8:10,color:"#c2410c",fontWeight:700}},"x1.25="+Math.round(hh*1.25*10)/10+"h"),
-        cv.fromCg&&React.createElement("div",{style:{fontSize:mob?7:9,color:"#888",fontStyle:"italic"}},"conge"),
-        cv.fixed&&React.createElement("div",{style:{fontSize:mob?7:9,color:isA?"#1a6ed8":"#aaa",fontStyle:"italic"}},isA?"✏️ modifiable":"fixe")
-      ):React.createElement("div",{style:{color:"#ddd",fontSize:18}},isA?"+":"")
-    );
-  };
-
-  const renderPlanning=()=>{
-    const wDays=getWD(mon),ouv=wDays.filter(d=>!isWE(d)),dims=wDays.filter(d=>isWE(d));
-    return React.createElement("div",null,
-      React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}},
-        React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
-          React.createElement("button",{onClick:()=>setMon(p=>addD(p,-7)),style:{...bs,padding:"8px 14px",fontSize:16}},"‹"),
-          React.createElement("div",{style:{textAlign:"center"}},
-            React.createElement("div",{style:{fontSize:mob?13:16,fontWeight:800,color:"#1a1a2e"}},mob?"Sem. "+frDC(mon)+" - "+frDC(addD(mon,5)):"Semaine "+frD(mon)+" au "+frD(addD(mon,5)))
-          ),
-          React.createElement("button",{onClick:()=>setMon(getMon(today)),style:{...bs,background:"#1a6ed8",color:"#fff",border:"none",fontSize:12,padding:"7px 10px"}},"Auj."),
-          React.createElement("button",{onClick:()=>setMon(p=>addD(p,7)),style:{...bs,padding:"8px 14px",fontSize:16}},"›")
-        )
-      ),
-      React.createElement("div",{style:{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",overflowX:"auto",WebkitOverflowScrolling:"touch"}},
-        React.createElement("table",{style:{borderCollapse:"collapse",width:"100%"}},
-          React.createElement("thead",null,
-            React.createElement("tr",{style:{background:"#fafafa",borderBottom:"2px solid #ebebeb"}},
-              React.createElement("th",{style:{padding:mob?"8px 6px":"12px 16px",textAlign:"left",fontSize:12,fontWeight:700,color:"#aaa",borderRight:"2px solid #ebebeb",position:"sticky",left:0,background:"#fafafa",zIndex:3,minWidth:mob?52:110}},"Jour"),
-              emps.map((emp,ei)=>React.createElement("th",{key:emp.id,style:{padding:mob?"8px 4px":"10px 12px",textAlign:"center",minWidth:mob?70:130,borderRight:"1px solid #ebebeb"}},
-                React.createElement("div",{style:{fontWeight:800,fontSize:mob?11:14,color:ea(ei)}},mob?emp.name.slice(0,6):emp.name),
-                !mob&&React.createElement("div",{style:{fontSize:10,color:"#aaa"}},hSem(emp.id)+"h/sem")
-              )),
-              !mob&&React.createElement("th",{style:{padding:"10px 12px",textAlign:"center",minWidth:90,fontSize:11,fontWeight:700,color:"#aaa",background:"#fafafa"}},"Total")
-            )
-          ),
-          React.createElement("tbody",null,
-            ouv.map((d,di)=>{
-              const k=dk(d),isT=k===dk(today);
-              return React.createElement("tr",{key:k,style:{borderBottom:"1px solid #f0f0f0",background:isT?"#f0f6ff":"#fff"}},
-                React.createElement("td",{style:{padding:mob?"8px 6px":"10px 16px",fontWeight:700,fontSize:mob?11:13,color:isT?"#1a6ed8":"#1a1a2e",borderRight:"2px solid #ebebeb",position:"sticky",left:0,background:isT?"#f0f6ff":"#fff",zIndex:2,whiteSpace:"nowrap"}},
-                  React.createElement("div",{style:{fontWeight:800}},mob?JOURS[d.getDay()-1].slice(0,3):JOURS[d.getDay()-1]),
-                  React.createElement("div",{style:{fontSize:mob?10:11,color:isT?"#1a6ed8":"#aaa"}},frDC(d))
-                ),
-                emps.map((emp,ei)=>renderCell(emp,ei,d,d.getDay()-1)),
-                !mob&&React.createElement("td",{style:{padding:"6px 8px",textAlign:"center",background:isT?"#f0f6ff":"#fafafa"}},
-                  (()=>{const tot=emps.reduce((sum,emp)=>{const cv=getCV(emp.id,k);return sum+(cv?parseH(cv.val,d.getDay()):0);},0);return tot>0?React.createElement("span",{style:{fontSize:12,fontWeight:700,color:"#555"}},Math.round(tot*10)/10+"h"):React.createElement("span",{style:{color:"#ddd"}},"--");})()
-                )
-              );
-            }),
-            React.createElement("tr",{style:{background:"#f8f8f8",borderTop:"2px solid #ebebeb"}},
-              React.createElement("td",{colSpan:emps.length+(mob?1:2),style:{padding:"4px 16px",fontSize:10,fontWeight:700,color:"#ccc",textTransform:"uppercase",position:"sticky",left:0}},"Dimanche")
-            ),
-            dims.map(d=>React.createElement("tr",{key:dk(d),style:{borderBottom:"1px solid #f0f0f0",background:"#f9f9f9"}},
-              React.createElement("td",{style:{padding:mob?"6px":"8px 16px",fontWeight:700,fontSize:mob?11:13,color:"#ccc",borderRight:"2px solid #ebebeb",position:"sticky",left:0,background:"#f9f9f9",zIndex:2}},
-                React.createElement("div",null,mob?"Dim":JOURS[6]),
-                React.createElement("div",{style:{fontSize:mob?10:11,color:"#ddd"}},frDC(d))
-              ),
-              emps.map((emp,ei)=>renderCell(emp,ei,d,6)),
-              !mob&&React.createElement("td",{style:{background:"#f8f8f8"}})
-            )),
-            React.createElement("tr",{style:{background:"#f5f6f8",borderTop:"2px solid #ebebeb"}},
-              React.createElement("td",{style:{padding:mob?"8px 6px":"10px 16px",fontWeight:800,fontSize:12,color:"#555",borderRight:"2px solid #ebebeb",position:"sticky",left:0,background:"#f5f6f8",zIndex:2,whiteSpace:"nowrap"}},"Total"),
-              emps.map((emp,ei)=>{
-                const ws=wkStats(emp.id,ouv);
-                return React.createElement("td",{key:emp.id,style:{padding:mob?"6px 4px":"10px 8px",textAlign:"center",borderRight:"1px solid #ebebeb"}},
-                  React.createElement("div",{style:{fontWeight:800,fontSize:mob?13:15,color:ws.tot>=ws.hs?"#059669":"#dc2626"}},ws.tot+"h"),
-                  React.createElement("div",{style:{fontSize:mob?9:11,color:"#aaa"}},"/"+ws.hs+"h"),
-                  ws.diff!==0&&React.createElement("div",{style:{fontSize:mob?9:11,fontWeight:700,color:ws.diff>0?"#d97706":"#dc2626"}},ws.diff>0?"+"+ws.diff+"h":ws.diff+"h")
-                );
-              }),
-              !mob&&React.createElement("td",{style:{background:"#f5f6f8"}})
-            )
-          )
-        )
-      ),
-      React.createElement("div",{style:{display:"flex",gap:5,flexWrap:"wrap",marginTop:10}},
-        [{l:"Bureau",c:"#1a6ed8"},{l:"Chateau",c:"#78350f"},{l:"T-C",c:"#4c1d95"},{l:"Tours N",c:"#14532d"},{l:"Blere",c:"#880e4f"},{l:"Conge",c:"#065f46"},{l:"RTT",c:"#1e40af"},{l:"Maladie",c:"#991b1b"},{l:"Ferie trav.",c:"#c2410c"}]
-        .map(x=>React.createElement("span",{key:x.l,style:{background:x.c+"15",color:x.c,border:"1px solid "+x.c+"33",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:600}},x.l))
-      )
-    );
-  };
-
-  const renderConges=()=>{
-    const fDay=new Date(cgY,cgM,1),lDay=new Date(cgY,cgM+1,0);
-    const sWD=fDay.getDay()===0?6:fDay.getDay()-1,rows=Math.ceil((sWD+lDay.getDate())/7);
-    const navCg=dir=>{let m=cgM+dir,y=cgY;if(m<0){m=11;y--;}if(m>11){m=0;y++;}setCgM(m);setCgY(y);};
-    const getJ=dStr=>conges.filter(g=>dStr>=g.debut&&dStr<=g.fin&&(g.statut==="valide"||g.statut==="attente"));
-    const clickD=day=>{
-      const s=cgY+"-"+pad(cgM+1)+"-"+pad(day);
-      if(!selS||(selS&&selE)){setSelS(s);setSelE(null);}
-      else{const lo=s<selS?s:selS,hi=s<selS?selS:s;setSelS(lo);setSelE(hi);setCgDeb(lo);setCgFin(hi);}
-    };
-    const inR=day=>{
-      const s=cgY+"-"+pad(cgM+1)+"-"+pad(day);
-      if(selS&&selE)return s>=selS&&s<=selE;
-      if(selS&&hovD){const lo=selS<hovD?selS:hovD,hi=selS<hovD?hovD:selS;return s>=lo&&s<=hi;}
-      return false;
-    };
-    const sCol=s=>s==="valide"?"#059669":s==="attente"?"#d97706":"#dc2626";
-    const sLbl=s=>s==="valide"?"Valide":s==="attente"?"En attente":"Refuse";
-    const enAtt=conges.filter(g=>g.statut==="attente");
-    const myEmp=emps.find(e=>e.name===session.user);
-    const mesD=conges.filter(g=>g.empId===(myEmp&&myEmp.id));
-    const minDStr=(()=>{const d=new Date();d.setMonth(d.getMonth()+1);return d.toISOString().split("T")[0];})();
-
-    return React.createElement("div",null,
-      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"}},
-        React.createElement("h2",{style:{fontSize:mob?17:20,fontWeight:800,color:"#1a1a2e"}},"🏖️ Conges"),
-        React.createElement("span",{style:{fontSize:11,fontWeight:700,color:sync.includes("Synchro")?"#059669":"#d97706"}},sync)
-      ),
-      isA&&enAtt.length>0&&React.createElement("div",{style:{background:"#fffbeb",border:"2px solid #fde68a",borderRadius:12,padding:16,marginBottom:16}},
-        React.createElement("div",{style:{fontSize:14,fontWeight:800,color:"#92400e",marginBottom:12}},"🟡 "+enAtt.length+" demande(s) en attente"),
-        enAtt.map(g=>{
-          const emp=emps.find(e=>e.id===g.empId),ei=emps.findIndex(e=>e.id===g.empId);
-          const col=CGC[g.type]||"#94a3b8",jj=jouv(new Date(g.debut+"T12:00"),new Date(g.fin+"T12:00"));
-          return React.createElement("div",{key:g.id,style:{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"#fff",borderRadius:10,marginBottom:8,border:"1px solid #fde68a",flexWrap:"wrap"}},
-            React.createElement("div",{style:{flex:1,minWidth:180}},
-              React.createElement("div",{style:{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexWrap:"wrap"}},
-                React.createElement("span",{style:{fontWeight:800,fontSize:13,color:ea(ei)}},"● "+(emp?emp.name:"?")),
-                React.createElement("span",{style:{background:col+"22",color:col,border:"1px solid "+col+"44",borderRadius:4,padding:"1px 6px",fontSize:10,fontWeight:700}},g.type),
-                React.createElement("span",{style:{fontSize:11,color:"#888"}},jj+"j")
-              ),
-              React.createElement("div",{style:{fontSize:12,color:"#666"}},frDS(g.debut)+" au "+frDS(g.fin)),
-              g.note&&React.createElement("div",{style:{fontSize:11,color:"#aaa",fontStyle:"italic"}},g.note)
-            ),
-            React.createElement("div",{style:{display:"flex",gap:6}},
-              React.createElement("button",{onClick:()=>valCg(g.id),style:{padding:"8px 14px",borderRadius:8,border:"none",background:"#059669",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer"}},"Valider"),
-              React.createElement("button",{onClick:()=>refCg(g.id),style:{padding:"8px 14px",borderRadius:8,border:"none",background:"#dc2626",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer"}},"Refuser"),
-              React.createElement("button",{onClick:()=>delCg(g.id),style:{padding:"8px 10px",borderRadius:8,border:"1px solid #e5e7eb",background:"#f8f9fa",color:"#888",fontWeight:600,fontSize:12,cursor:"pointer"}},"Suppr.")
-            )
-          );
-        })
-      ),
-      React.createElement("div",{style:{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 340px",gap:16,alignItems:"start"}},
-        React.createElement("div",{style:{background:"#fff",borderRadius:14,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",border:"1px solid #e5e7eb"}},
-          React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}},
-            React.createElement("button",{onClick:()=>navCg(-1),style:bs},"‹"),
-            React.createElement("span",{style:{fontSize:15,fontWeight:800,color:"#1a1a2e",textTransform:"capitalize"}},frM(cgY,cgM)),
-            React.createElement("button",{onClick:()=>navCg(1),style:bs},"›")
-          ),
-          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}},
-            ["L","M","M","J","V","S","D"].map((j,i)=>React.createElement("div",{key:i,style:{textAlign:"center",fontSize:10,fontWeight:700,color:"#bbb"}},j))
-          ),
-          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:mob?4:2}},
-            Array.from({length:rows*7},(_,i)=>{
-              const day=i-sWD+1,ok=day>=1&&day<=lDay.getDate();
-              const dStr=ok?cgY+"-"+pad(cgM+1)+"-"+pad(day):"";
-              const dObj=ok?new Date(cgY,cgM,day):null,isWEd=dObj&&isWE(dObj),isT=dStr===dk(today);
-              const cgsJ=ok?getJ(dStr):[],inRng=ok&&inR(day),isSS=dStr===selS,isSE=dStr===selE;
-              return React.createElement("div",{
-                key:i,onClick:()=>ok&&!isWEd&&clickD(day),
-                onMouseEnter:()=>ok&&selS&&!selE&&setHovD(dStr),onMouseLeave:()=>setHovD(null),
-                style:{minHeight:mob?50:52,borderRadius:7,padding:2,background:isSS||isSE?"#1a6ed8":inRng?"#dbeafe":isWEd?"#f5f5f5":isT?"#eff6ff":"#fff",border:isT?"2px solid #1a6ed8":"1px solid #f0f0f0",cursor:ok&&!isWEd?"pointer":"default",opacity:ok?1:0}
-              },ok&&React.createElement("div",null,
-                React.createElement("div",{style:{fontSize:mob?13:10,fontWeight:isT?800:600,color:isSS||isSE?"#fff":isWEd?"#ccc":"#333",textAlign:"center",marginBottom:1}},day),
-                cgsJ.slice(0,2).map(g=>{
-                  const ei=emps.findIndex(e=>e.id===g.empId);
-                  const dc=g.statut==="valide"?ea(ei):g.statut==="attente"?"#d97706":"#dc2626";
-                  const en=emps.find(e=>e.id===g.empId);
-                  return React.createElement("div",{key:g.id,style:{fontSize:8,fontWeight:700,color:"#fff",background:dc,borderRadius:3,padding:"1px 3px",marginBottom:1,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}},en?en.name.slice(0,5):"?");
-                }),
-                cgsJ.length>2&&React.createElement("div",{style:{fontSize:7,color:"#aaa"}},"+"+( cgsJ.length-2))
-              ));
-            })
-          ),
-          React.createElement("div",{style:{marginTop:10,fontSize:11,color:"#aaa",textAlign:"center"}},
-            !selS?"Cliquez le 1er jour":!selE?"Cliquez le dernier jour":"Plage: "+frDC(new Date(selS+"T12:00"))+" au "+frDC(new Date(selE+"T12:00"))
-          ),
-          React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:5,marginTop:12,paddingTop:10,borderTop:"1px solid #f0f0f0"}},
-            emps.map((emp,ei)=>{
-              const nb=conges.filter(g=>g.empId===emp.id&&g.statut==="valide").length;
-              const att=conges.filter(g=>g.empId===emp.id&&g.statut==="attente").length;
-              return React.createElement("span",{key:emp.id,style:{background:ea(ei)+"22",color:ea(ei),border:"1px solid "+ea(ei)+"44",borderRadius:6,padding:"3px 8px",fontSize:mob?12:10,fontWeight:700}},emp.name+(nb>0?" ("+nb+")":(att>0?" ("+att+" att.)":"")));
-            })
-          )
-        ),
-        React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:12}},
-          React.createElement("div",{style:{background:"#fff",borderRadius:14,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",border:"1px solid #e5e7eb"}},
-            React.createElement("div",{style:{fontSize:14,fontWeight:800,color:"#1a1a2e",marginBottom:4}},isA?"Ajouter un conge":"Demander un conge"),
-            !isA&&React.createElement("div",{style:{fontSize:11,color:"#d97706",marginBottom:12,background:"#fffbeb",borderRadius:7,padding:"8px 10px",border:"1px solid #fde68a"}},"Au moins 1 mois a l avance. Soumis a validation par Laetitia."),
-            isA&&React.createElement("div",{style:{marginBottom:10}},
-              React.createElement("label",{style:lb},"Collaborateur"),
-              React.createElement("select",{value:cgEmp,onChange:e=>setCgEmp(e.target.value),style:{...ip,marginBottom:0}},
-                React.createElement("option",{value:""},"-- Choisir --"),
-                emps.map(e=>React.createElement("option",{key:e.id,value:e.id},e.name))
-              )
-            ),
-            React.createElement("label",{style:lb},"Type"),
-            React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:5,marginBottom:10}},
-              TCG.map((t,ti)=>{const col=CGC[t]||"#94a3b8";return React.createElement("button",{key:t,onClick:()=>setCgTyp(t),style:{padding:"5px 10px",borderRadius:20,border:"1.5px solid "+(cgTyp===t?col:"#e5e7eb"),background:cgTyp===t?col+"22":"#fff",color:cgTyp===t?col:"#555",fontWeight:700,fontSize:12,cursor:"pointer"}},TCG_D[ti]);})
-            ),
-            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}},
-              React.createElement("div",null,React.createElement("label",{style:lb},"Debut"),React.createElement("input",{type:"date",value:cgDeb,min:!isA?minDStr:"",onChange:e=>setCgDeb(e.target.value),style:ip})),
-              React.createElement("div",null,React.createElement("label",{style:lb},"Fin"),React.createElement("input",{type:"date",value:cgFin,min:cgDeb||(!isA?minDStr:""),onChange:e=>setCgFin(e.target.value),style:ip}))
-            ),
-            cgDeb&&cgFin&&React.createElement("div",{style:{background:"#f0f8ff",borderRadius:8,padding:"7px 10px",marginBottom:10,fontSize:12,color:"#1a6ed8",border:"1px solid #cce5ff"}},jouv(new Date(cgDeb+"T12:00"),new Date(cgFin+"T12:00"))+" jours ouvres"),
-            React.createElement("label",{style:lb},"Note"),
-            React.createElement("input",{value:cgNot,onChange:e=>setCgNot(e.target.value),placeholder:"Ex: Vacances...",style:{...ip,marginBottom:12}}),
-            isA
-              ?React.createElement("button",{onClick:addCgA,disabled:!cgEmp||!cgDeb||!cgFin,style:{width:"100%",padding:"10px 0",borderRadius:9,border:"none",background:cgEmp&&cgDeb&&cgFin?"#1a6ed8":"#e5e7eb",color:cgEmp&&cgDeb&&cgFin?"#fff":"#aaa",fontWeight:800,fontSize:14,cursor:cgEmp&&cgDeb&&cgFin?"pointer":"default"}},"Ajouter (valide)")
-              :React.createElement("button",{onClick:demCg,disabled:!cgDeb||!cgFin,style:{width:"100%",padding:"10px 0",borderRadius:9,border:"none",background:cgDeb&&cgFin?"#d97706":"#e5e7eb",color:cgDeb&&cgFin?"#fff":"#aaa",fontWeight:800,fontSize:14,cursor:cgDeb&&cgFin?"pointer":"default"}},"Envoyer la demande")
-          ),
-          !isA&&React.createElement("div",{style:{background:"#fff",borderRadius:14,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",border:"1px solid #e5e7eb"}},
-            React.createElement("div",{style:{fontSize:13,fontWeight:800,color:"#1a1a2e",marginBottom:12}},"Mes demandes ("+mesD.length+")"),
-            mesD.length===0?React.createElement("div",{style:{color:"#ccc",fontSize:13,textAlign:"center",padding:"14px 0"}},"Aucune demande"):
-            [...mesD].sort((a,b)=>b.demandeLe.localeCompare(a.demandeLe)).map(g=>{
-              const col=CGC[g.type]||"#94a3b8",jj=jouv(new Date(g.debut+"T12:00"),new Date(g.fin+"T12:00")),sc=sCol(g.statut);
-              return React.createElement("div",{key:g.id,style:{padding:"10px 12px",background:"#f8f9fa",borderRadius:10,marginBottom:8,borderLeft:"4px solid "+sc}},
-                React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}},
-                  React.createElement("div",{style:{display:"flex",gap:5,alignItems:"center"}},
-                    React.createElement("span",{style:{background:col+"22",color:col,border:"1px solid "+col+"44",borderRadius:4,padding:"1px 6px",fontSize:10,fontWeight:700}},g.type),
-                    React.createElement("span",{style:{fontSize:11,color:"#888"}},jj+"j")
-                  ),
-                  React.createElement("span",{style:{fontSize:11,fontWeight:700,color:sc}},sLbl(g.statut))
-                ),
-                React.createElement("div",{style:{fontSize:12,color:"#555"}},frDS(g.debut)+" au "+frDS(g.fin)),
-                g.note&&React.createElement("div",{style:{fontSize:11,color:"#aaa",fontStyle:"italic",marginTop:2}},g.note),
-                (g.statut==="attente"||g.statut==="refuse")&&React.createElement("button",{onClick:()=>delCg(g.id),style:{marginTop:6,padding:"4px 10px",borderRadius:7,border:"1px solid #e5e7eb",background:"#f8f9fa",color:"#888",fontWeight:600,fontSize:11,cursor:"pointer"}},"Annuler")
-              );
-            })
-          ),
-          isA&&React.createElement("div",{style:{background:"#fff",borderRadius:14,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",border:"1px solid #e5e7eb"}},
-            React.createElement("div",{style:{fontSize:13,fontWeight:800,color:"#1a1a2e",marginBottom:12}},"Tous les conges ("+conges.length+")"),
-            conges.length===0?React.createElement("div",{style:{color:"#ccc",fontSize:13,textAlign:"center",padding:"14px 0"}},"Aucun conge"):
-            [...conges].sort((a,b)=>a.debut.localeCompare(b.debut)).map(g=>{
-              const emp=emps.find(e=>e.id===g.empId),ei=emps.findIndex(e=>e.id===g.empId);
-              const col=CGC[g.type]||"#94a3b8",jj=jouv(new Date(g.debut+"T12:00"),new Date(g.fin+"T12:00")),sc=sCol(g.statut);
-              return React.createElement("div",{key:g.id,style:{display:"flex",alignItems:"flex-start",gap:8,padding:"8px 10px",background:"#f8f9fa",borderRadius:9,marginBottom:6,borderLeft:"4px solid "+sc}},
-                React.createElement("div",{style:{flex:1}},
-                  React.createElement("div",{style:{display:"flex",alignItems:"center",gap:5,marginBottom:2,flexWrap:"wrap"}},
-                    React.createElement("span",{style:{fontWeight:700,fontSize:12,color:ea(ei)}},"● "+(emp?emp.name:"?")),
-                    React.createElement("span",{style:{background:col+"22",color:col,border:"1px solid "+col+"44",borderRadius:4,padding:"0 5px",fontSize:9,fontWeight:700}},g.type),
-                    React.createElement("span",{style:{fontSize:9,color:"#aaa"}},jj+"j"),
-                    React.createElement("span",{style:{fontSize:9,fontWeight:700,color:sc}},sLbl(g.statut))
-                  ),
-                  React.createElement("div",{style:{fontSize:11,color:"#666"}},frDS(g.debut)+" au "+frDS(g.fin)),
-                  g.note&&React.createElement("div",{style:{fontSize:10,color:"#aaa",fontStyle:"italic"}},g.note)
-                ),
-                React.createElement("button",{onClick:()=>delCg(g.id),style:{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:14,padding:"2px"}},"X")
-              );
-            })
-          ),
-          React.createElement("div",{style:{background:"#fff",borderRadius:14,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",border:"1px solid #e5e7eb"}},
-            React.createElement("div",{style:{fontSize:13,fontWeight:800,color:"#1a1a2e",marginBottom:12}},"Soldes valides"),
-            emps.map((emp,ei)=>{
-              const myCgs=conges.filter(g=>g.empId===emp.id&&g.statut==="valide");
-              const cpJ=myCgs.filter(g=>g.type==="Conge").reduce((s,g)=>s+jouv(new Date(g.debut+"T12:00"),new Date(g.fin+"T12:00")),0);
-              const rJ=myCgs.filter(g=>g.type==="RTT").reduce((s,g)=>s+jouv(new Date(g.debut+"T12:00"),new Date(g.fin+"T12:00")),0);
-              const tot=myCgs.reduce((s,g)=>s+jouv(new Date(g.debut+"T12:00"),new Date(g.fin+"T12:00")),0);
-              const att=conges.filter(g=>g.empId===emp.id&&g.statut==="attente").length;
-              return React.createElement("div",{key:emp.id,style:{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:8,marginBottom:5,background:"#f8f9fa",borderLeft:"4px solid "+ea(ei)}},
-                React.createElement("span",{style:{fontWeight:700,fontSize:12,color:ea(ei),minWidth:72}},emp.name),
-                React.createElement("span",{style:{fontSize:11,color:"#059669",fontWeight:700}},cpJ+"j CP"),
-                React.createElement("span",{style:{fontSize:11,color:"#6366f1",fontWeight:700}},rJ+"j RTT"),
-                att>0&&React.createElement("span",{style:{fontSize:10,color:"#d97706",fontWeight:700}},att+" att."),
-                React.createElement("span",{style:{fontSize:11,color:"#555",marginLeft:"auto"}},tot+"j")
-              );
-            })
-          )
-        )
-      )
-    );
-  };
-
-  const renderRecap=()=>{
-    const weeks=getMW(recY,recM);
-    const navR=dir=>{let m=recM+dir,y=recY;if(m<0){m=11;y--;}if(m>11){m=0;y++;}setRecM(m);setRecY(y);};
-    const visE=isA?emps:emps.filter(e=>e.name===session.user);
-    return React.createElement("div",null,
-      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:12,marginBottom:20,flexWrap:"wrap"}},
-        React.createElement("h2",{style:{fontSize:mob?17:20,fontWeight:800,color:"#1a1a2e"}},isA?"Compte rendu mensuel":"Mon compte rendu"),
-        React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
-          React.createElement("button",{onClick:()=>navR(-1),style:bs},"‹"),
-          React.createElement("span",{style:{fontSize:mob?13:15,fontWeight:700,textTransform:"capitalize",minWidth:mob?120:150,textAlign:"center"}},frM(recY,recM)),
-          React.createElement("button",{onClick:()=>navR(1),style:bs},"›")
-        ),
-        React.createElement("button",{onClick:expR,style:{padding:"8px 14px",borderRadius:8,border:"none",background:"#059669",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer"}},"⬇️ Export")
-      ),
-      visE.map(emp=>{
-        const rei=emps.findIndex(e=>e.id===emp.id),s=mStats(emp.id,recY,recM);
-        const wRows=weeks.map(w=>{
-          let wH=0,wHS=0,wHF=0;
-          w.wd.forEach(d=>{
-            const cv=getCV(emp.id,dk(d));if(!cv)return;
-            const up=(cv.val||"").toUpperCase(),hh=parseH(cv.val,d.getDay());
-            if(up.includes("FERIE TRAVAIL"))wHF+=Math.round(hh*1.25*10)/10;
-            else if(up!=="OFF"){wH+=hh;if(cv.hsupp)wHS+=Number(cv.hsupp);}
-          });
-          wH=Math.round(wH*10)/10;wHF=Math.round(wHF*10)/10;
-          const tot=Math.round((wH+wHS+wHF)*10)/10,diff=Math.round((tot-s.hs)*10)/10;
-          return{mon:w.mon,wd:w.wd,wH,wHS,wHF,tot,diff};
-        });
-        const boxes=[
-          {l:"H.trav.",v:s.hT,u:"h",c:"#1a6ed8"},{l:"H.supp.",v:s.hS,u:"h",c:"#d97706"},
-          {l:"Feries trav.",v:s.ftJ,u:"j",c:"#c2410c"},{l:"H.feries +25%",v:s.hFM,u:"h",c:"#c2410c"},
-          {l:"Total H.",v:s.hTot,u:"h",c:s.ecart>=0?"#059669":"#dc2626"},
-          {l:"Ecart",v:(s.ecart>0?"+":"")+s.ecart,u:"h",c:s.ecart>=0?"#059669":"#dc2626"},
-          {l:"CP",v:s.cpJ,u:"j",c:"#065f46"},{l:"RTT",v:s.rJ,u:"j",c:"#1e40af"},{l:"Maladie",v:s.mJ,u:"j",c:"#991b1b"},
-        ];
-        return React.createElement("div",{key:emp.id,style:{background:"#fff",borderRadius:12,padding:18,marginBottom:14,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",border:"1px solid #e5e7eb",borderLeft:"5px solid "+ea(rei)}},
-          React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:14}},
-            React.createElement("span",{style:{color:ea(rei),fontSize:15}},"●"),
-            React.createElement("span",{style:{fontSize:15,fontWeight:800}},emp.name),
-            React.createElement("span",{style:{fontSize:11,color:"#aaa"}},s.jo+"j ouvres - "+s.hTh+"h theoriques (contrat "+s.hs+"h/sem)")
-          ),
-          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8,marginBottom:14}},
-            boxes.map(x=>React.createElement("div",{key:x.l,style:{background:x.c+"11",border:"1px solid "+x.c+"22",borderRadius:8,padding:"8px 10px"}},
-              React.createElement("div",{style:{fontSize:10,color:"#aaa",fontWeight:600,textTransform:"uppercase",marginBottom:2}},x.l),
-              React.createElement("div",{style:{fontSize:18,fontWeight:800,color:x.c}},x.v,React.createElement("span",{style:{fontSize:10,color:"#aaa",marginLeft:1}},x.u))
-            ))
-          ),
-          s.ftJ>0&&React.createElement("div",{style:{background:"#fff7ed",borderRadius:10,padding:"10px 14px",marginBottom:14,border:"2px solid #fed7aa"}},
-            React.createElement("div",{style:{fontSize:12,fontWeight:800,color:"#c2410c",marginBottom:4}},"Feries travailles +25%"),
-            React.createElement("div",{style:{fontSize:12,color:"#92400e"}},s.hFB+"h x 1.25 = "+s.hFM+"h")
-          ),
-          React.createElement("div",{style:{overflowX:"auto"}},
-            React.createElement("table",{style:{borderCollapse:"collapse",width:"100%"}},
-              React.createElement("thead",null,React.createElement("tr",null,["Semaine","H.trav.","H.supp.","H.feries","Total","Ecart"].map(h=>React.createElement("th",{key:h,style:{padding:"5px 8px",background:"#f8f9fa",color:"#888",fontSize:10,fontWeight:700,textAlign:"left",borderBottom:"1px solid #eee"}},h)))),
-              React.createElement("tbody",null,wRows.map((w,wi)=>React.createElement("tr",{key:wi},
-                React.createElement("td",{style:tdS},frDC(w.mon)+" - "+frDC(addD(w.mon,5))),
-                React.createElement("td",{style:tdS},w.wH+"h"),
-                React.createElement("td",{style:{...tdS,color:w.wHS>0?"#d97706":"#ccc",fontWeight:w.wHS>0?700:400}},w.wHS>0?"+"+w.wHS+"h":"--"),
-                React.createElement("td",{style:{...tdS,color:w.wHF>0?"#c2410c":"#ccc",fontWeight:w.wHF>0?700:400}},w.wHF>0?"+"+w.wHF+"h":"--"),
-                React.createElement("td",{style:{...tdS,fontWeight:700}},w.tot+"h"),
-                React.createElement("td",{style:tdS},React.createElement("span",{style:{background:w.diff>0?"#fff8e1":w.diff<0?"#fde8e8":"#ecfdf5",color:w.diff>0?"#d97706":w.diff<0?"#dc2626":"#059669",borderRadius:20,padding:"2px 7px",fontSize:11,fontWeight:700}},w.diff>0?"+"+w.diff+"h":w.diff<0?w.diff+"h":"OK"))
-              ))),
-              React.createElement("tfoot",null,React.createElement("tr",null,
-                React.createElement("td",{colSpan:4,style:{...tdS,fontWeight:700,color:"#555",paddingTop:8}},"Total mois:"),
-                React.createElement("td",{style:{...tdS,fontWeight:800,fontSize:15,color:s.hTot>=s.hTh?"#059669":"#dc2626",paddingTop:8}},s.hTot+"h"),
-                React.createElement("td",{style:{...tdS,paddingTop:8}},React.createElement("span",{style:{background:s.ecart>=0?"#ecfdf5":"#fde8e8",color:s.ecart>=0?"#059669":"#dc2626",borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:800}},s.ecart>0?"+"+s.ecart+"h":s.ecart<0?s.ecart+"h":"Parfait"))
-              ))
-            )
-          )
-        );
-      }),
-      isA&&React.createElement("div",{style:{background:"#1a1a2e",borderRadius:12,padding:18,border:"1px solid #333"}},
-        React.createElement("div",{style:{fontSize:14,fontWeight:800,color:"#fff",marginBottom:12}},"Synthese equipe - "+frM(recY,recM)),
-        React.createElement("table",{style:{borderCollapse:"collapse",width:"100%"}},
-          React.createElement("thead",null,React.createElement("tr",null,["Employe","Contrat","H.trav.","Total","Ecart","CP","RTT"].map(h=>React.createElement("th",{key:h,style:{padding:"6px 8px",background:"#252540",color:"#888",fontSize:10,fontWeight:700,textAlign:"left",borderBottom:"1px solid #333"}},h)))),
-          React.createElement("tbody",null,emps.map((emp,ei)=>{
-            const s=mStats(emp.id,recY,recM);
-            return React.createElement("tr",{key:emp.id},
-              React.createElement("td",{style:{padding:"7px 8px",color:"#fff",fontWeight:700,borderBottom:"1px solid #333",fontSize:12}},React.createElement("span",{style:{color:ea(ei)}},"● "),emp.name),
-              React.createElement("td",{style:{padding:"7px 8px",color:"#aaa",borderBottom:"1px solid #333",fontSize:11}},s.hs+"h"),
-              React.createElement("td",{style:{padding:"7px 8px",color:"#aaa",borderBottom:"1px solid #333",fontSize:12}},s.hT+"h"),
-              React.createElement("td",{style:{padding:"7px 8px",color:"#fff",fontWeight:800,borderBottom:"1px solid #333",fontSize:12}},s.hTot+"h"),
-              React.createElement("td",{style:{padding:"7px 8px",borderBottom:"1px solid #333"}},React.createElement("span",{style:{background:s.ecart>=0?"#059669":"#dc2626",color:"#fff",borderRadius:20,padding:"2px 7px",fontSize:10,fontWeight:700}},s.ecart>0?"+"+s.ecart+"h":s.ecart<0?s.ecart+"h":"OK")),
-              React.createElement("td",{style:{padding:"7px 8px",color:s.cpJ>0?"#34d399":"#555",borderBottom:"1px solid #333",fontSize:12}},s.cpJ>0?s.cpJ+"j":"--"),
-              React.createElement("td",{style:{padding:"7px 8px",color:s.rJ>0?"#818cf8":"#555",borderBottom:"1px solid #333",fontSize:12}},s.rJ>0?s.rJ+"j":"--")
-            );
-          }))
-        )
-      )
-    );
-  };
-
-  const renderEquipe=()=>React.createElement("div",{style:{maxWidth:480}},
-    React.createElement("h2",{style:{fontSize:20,fontWeight:800,color:"#1a1a2e",marginBottom:18}},"Gestion de l equipe"),
-    emps.map((emp,ei)=>React.createElement("div",{key:emp.id,style:{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#fff",borderRadius:10,marginBottom:7,border:"1px solid #e5e7eb",borderLeft:"4px solid "+ea(ei)}},
-      React.createElement("span",{style:{color:ea(ei)}},"●"),
-      React.createElement("span",{style:{flex:1,fontWeight:700,fontSize:14}},emp.name),
-      React.createElement("span",{style:{fontSize:11,color:"#aaa"}},(emp.hSem||35)+"h/sem"),
-      React.createElement("button",{onClick:()=>{const l=emps.filter(e=>e.id!==emp.id);setEmps(l);svE(l);},style:{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:16}},"X")
-    )),
-    React.createElement("div",{style:{background:"#fff",borderRadius:12,padding:18,marginTop:18,border:"1px solid #e5e7eb"}},
-      React.createElement("div",{style:{fontSize:13,fontWeight:800,marginBottom:12}},"Ajouter un employe"),
-      React.createElement("label",{style:lb},"Nom"),
-      React.createElement("input",{value:newN,onChange:e=>setNewN(e.target.value),onKeyDown:e=>e.key==="Enter"&&addE(),placeholder:"Prenom Nom",style:{...ip,marginBottom:12}}),
-      React.createElement("button",{onClick:addE,style:{width:"100%",padding:"10px 0",borderRadius:8,border:"none",background:"#1a6ed8",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}},"+ Ajouter")
-    )
-  );
-
-  const renderModal=()=>{
-    if(!modal)return null;
-    const emp=emps.find(e=>e.id===modal.empId),ei=emps.findIndex(e=>e.id===modal.empId);
-    const toMin=t=>{const parts=t.replace(/[hH]/,":").split(":");return parseInt(parts[0])*60+(parseInt(parts[1])||0);};
-    const dRaw=mDeb&&mFin?toMin(mFin)-toMin(mDeb):0;
-    const isCh=mLieu.toUpperCase().includes("CHATEAU"),isSam=modal.date.getDay()===6;
-    const pause=dRaw>360?(isCh?(isSam?60:90):60):0;
-    const duree=mDeb&&mFin&&dRaw>0?Math.round((dRaw-pause)/60*10)/10:null;
-    const slS={flex:1,border:"1.5px solid #e5e7eb",borderRadius:9,padding:"8px 7px",fontSize:13,color:"#1a1a2e",background:"#f8f9fa"};
-    return React.createElement("div",{onClick:e=>e.target===e.currentTarget&&setModal(null),style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",display:"flex",alignItems:mob?"flex-end":"center",justifyContent:"center",zIndex:100,backdropFilter:"blur(3px)"}},
-      React.createElement("div",{style:{background:"#fff",borderRadius:mob?"20px 20px 0 0":"16px",padding:mob?"20px 16px":26,width:mob?"100%":420,maxWidth:"100vw",boxShadow:"0 20px 60px rgba(0,0,0,0.2)",maxHeight:"90vh",overflowY:"auto"}},
-        React.createElement("div",{style:{fontSize:15,fontWeight:800,marginBottom:2,color:ea(ei)}},"● "+(emp?emp.name:"")),
-        React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:16}},JOURS[modal.dayIdx]+" "+frDC(modal.date)),
-        React.createElement("label",{style:lb},"Lieu de travail"),
-        React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:5,marginBottom:12}},
-          LIEUX.map((l,li)=>React.createElement("button",{key:l,onClick:()=>{setMLieu(l===mLieu?"":l);setMAbs("");setMFer(false);},style:{padding:"5px 10px",borderRadius:20,border:"1.5px solid "+(mLieu===l?"#1a6ed8":"#e5e7eb"),background:mLieu===l?"#1a6ed8":"#fff",color:mLieu===l?"#fff":"#555",fontWeight:600,fontSize:12,cursor:"pointer"}},LIEUX_D[li]))
-        ),
-        React.createElement("div",{style:{marginBottom:12}},
-          React.createElement("button",{onClick:()=>{setMFer(f=>!f);if(!mFer){setMAbs("");setMLieu("");}},style:{padding:"6px 14px",borderRadius:20,border:"1.5px solid "+(mFer?"#c2410c":"#e5e7eb"),background:mFer?"#fff0e0":"#fff",color:mFer?"#c2410c":"#555",fontWeight:700,fontSize:12,cursor:"pointer"}},"🔶 Ferie travaille"),
-          mFer&&React.createElement("span",{style:{marginLeft:8,fontSize:11,color:"#c2410c",fontWeight:600}},"+25% applique")
-        ),
-        !mAbs&&React.createElement("div",null,
-          React.createElement("label",{style:lb},"Horaires"),
-          React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:8}},
-            React.createElement("select",{value:mDeb,onChange:e=>{setMDeb(e.target.value);if(!mFin||e.target.value>=mFin)setMFin("");},style:slS},
-              React.createElement("option",{value:""},"Debut"),SLOTS.map(t=>React.createElement("option",{key:t,value:t},t))
-            ),
-            React.createElement("span",{style:{color:"#aaa",fontWeight:700}},"-"),
-            React.createElement("select",{value:mFin,onChange:e=>setMFin(e.target.value),style:slS},
-              React.createElement("option",{value:""},"Fin"),SLOTS.filter(t=>!mDeb||t>mDeb).map(t=>React.createElement("option",{key:t,value:t},t))
-            )
-          ),
-          duree!==null&&duree>0&&React.createElement("div",{style:{background:"#eff6ff",borderRadius:8,padding:"6px 10px",marginBottom:10,fontSize:12,color:"#1a6ed8",border:"1px solid #bfdbfe"}},
-            mDeb+" - "+mFin+" = ",React.createElement("strong",null,duree+"h"),
-            " (pause "+(isCh?(isSam?"1h":"1h30"):dRaw>360?"1h":"aucune")+")",
-            mFer&&React.createElement("span",{style:{color:"#c2410c"}}," => "+Math.round(duree*1.25*10)/10+"h avec +25%")
-          )
-        ),
-        React.createElement("label",{style:lb},"Absence"),
-        React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:5,marginBottom:14}},
-          ABS.map((a,ai)=>React.createElement("button",{key:a,onClick:()=>{setMAbs(a===mAbs?"":a);if(a!==mAbs){setMLieu("");setMDeb("");setMFin("");setMFer(false);}},style:{padding:"5px 10px",borderRadius:20,border:"1.5px solid "+(mAbs===a?"#dc2626":"#e5e7eb"),background:mAbs===a?"#dc2626":"#fff",color:mAbs===a?"#fff":"#555",fontWeight:600,fontSize:12,cursor:"pointer"}},ABS_D[ai]))
-        ),
-        React.createElement("label",{style:lb},"H. supplementaires"),
-        React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:16}},
-          React.createElement("input",{type:"number",min:0,max:12,step:0.5,value:mHS,onChange:e=>setMHS(e.target.value),style:{width:75,border:"1.5px solid #e5e7eb",borderRadius:8,padding:"8px 10px",fontSize:14,textAlign:"center",background:"#f8f9fa"}}),
-          React.createElement("span",{style:{color:"#888",fontSize:12}},"h supp ce jour")
-        ),
-        React.createElement("div",{style:{display:"flex",gap:7}},
-          React.createElement("button",{onClick:svM,style:{flex:1,padding:"11px 0",borderRadius:9,border:"none",background:"#1a6ed8",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer"}},"Enregistrer"),
-          React.createElement("button",{onClick:clM,style:{padding:"11px 12px",borderRadius:9,border:"1px solid #fca5a5",background:"#fde8e8",color:"#dc2626",fontWeight:700,fontSize:13,cursor:"pointer"}},"Effacer"),
-          React.createElement("button",{onClick:()=>setModal(null),style:{padding:"11px 12px",borderRadius:9,border:"1px solid #e5e7eb",background:"#f8f9fa",color:"#888",fontWeight:600,fontSize:13,cursor:"pointer"}},"Annuler")
-        )
-      )
-    );
-  };
-
-  if(!sesOk)return null;
-  if(!session)return React.createElement(Login,{onLogin:s=>setSession(s)});
-
-  return React.createElement("div",{style:{minHeight:"100vh",background:"#f5f6f8",fontFamily:"'Segoe UI',Arial,sans-serif"}},
-    React.createElement("div",{style:{background:"#fff",borderBottom:"1px solid #e5e7eb",padding:mob?"8px 12px":"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,boxShadow:"0 1px 3px rgba(0,0,0,0.05)",position:"sticky",top:0,zIndex:10}},
-      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}},
-        React.createElement("div",{style:{width:32,height:32,background:"linear-gradient(135deg,#1a6ed8,#8b1ad6)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}},"📅"),
-        !mob&&React.createElement("div",null,
-          React.createElement("div",{style:{fontSize:14,fontWeight:800,color:"#1a1a2e",lineHeight:1}},"Planning Equipe"),
-          React.createElement("div",{style:{fontSize:9,color:sync.includes("Synchro")?"#059669":sync.includes("Err")?"#dc2626":"#d97706",fontWeight:600}},sync)
-        )
-      ),
-      React.createElement("div",{style:{display:"flex",gap:mob?4:5,flexWrap:"nowrap"}},
-        NB("planning",mob?"📅":"📅 Planning"),
-        NB("conges",mob?"🏖️":"🏖️ Conges"),
-        NB("recap",mob?"📊":"📊 Compte rendu"),
-        isA&&NB("equipe",mob?"👥":"👥 Equipe")
-      ),
-      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:6}},
-        !mob&&React.createElement("div",{style:{textAlign:"right",lineHeight:1.3}},
-          React.createElement("div",{style:{fontSize:12,fontWeight:700,color:"#1a1a2e"}},session.user),
-          React.createElement("div",{style:{fontSize:10,color:isA?"#8b1ad6":"#1a6ed8",fontWeight:600}},isA?"Admin":"Lecteur")
-        ),
-        React.createElement("button",{onClick:()=>{clS();setSession(null);},style:{padding:"6px 10px",borderRadius:7,border:"1px solid #e5e7eb",background:"#f8f9fa",color:"#888",fontWeight:600,fontSize:11,cursor:"pointer"}},mob?"↩":"Deconnexion")
-      )
-    ),
-    !isA&&React.createElement("div",{style:{background:"#fffbeb",borderBottom:"1px solid #fde68a",padding:"6px 16px",fontSize:11,color:"#d97706",fontWeight:600}},"Mode consultation - Seule Laetitia peut modifier le planning."),
-    React.createElement("div",{style:{padding:mob?"10px":16,maxWidth:1400,margin:"0 auto"}},
-      view==="planning"&&renderPlanning(),
-      view==="conges"&&renderConges(),
-      view==="recap"&&renderRecap(),
-      view==="equipe"&&renderEquipe()
-    ),
-    isA&&renderModal()
-  );
+@media (max-width:820px){
+  .app{grid-template-columns:1fr}
+  .side{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);align-items:center;padding:10px}
+  .me{display:none}
+  .nv{white-space:nowrap}
+  .main{padding:18px}
+  .eq,.cw{grid-template-columns:1fr}
+  .msg{grid-template-columns:1fr}
+  .threads{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);overflow-x:auto}
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+/* sections */
+section{padding-block:84px}
+.sec-head{max-width:700px;margin-bottom:40px}
+.sec-head h2{font-size:clamp(30px,4.4vw,48px);font-weight:800}
+.sec-head p{color:var(--muted);margin-top:14px;font-size:18px}
+.eyebrow{font-weight:700;font-size:14px;color:var(--accent);margin-bottom:10px;display:block}
+
+.replace{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+.replace div{background:var(--surface);border-radius:24px;padding:26px}
+.replace h3{font-size:21px;font-weight:700}
+.replace s{color:var(--muted);text-decoration-thickness:2px}
+.replace p{color:var(--muted);font-size:16px;margin-top:8px}
+
+.feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.fc{padding:8px 0}
+.ic{width:52px;height:52px;border-radius:16px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.ic svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.fc h3{font-size:22px;font-weight:700}
+.fc p{color:var(--muted);margin-top:8px}
+.limit{margin-top:36px;background:var(--surface);border-radius:24px;padding:26px 30px;display:flex;gap:18px 32px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.limit h3{font-size:22px;font-weight:700}
+.limit p{color:var(--muted);max-width:60ch;margin-top:6px}
+
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
+.step{border:1px solid var(--line);border-radius:24px;padding:28px}
+.step .n{width:36px;height:36px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.step h3{font-size:22px;font-weight:700;margin-top:18px}
+.step p{color:var(--muted);margin-top:8px}
+
+.origin{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:48px;align-items:center}
+.figs{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.figs div{background:var(--surface);border-radius:24px;padding:22px 20px}
+.figs strong{display:block;font-size:clamp(30px,4.4vw,48px);font-weight:800;letter-spacing:-.03em;line-height:1}
+.figs span{display:block;font-size:14px;color:var(--muted);margin-top:8px;line-height:1.35}
+
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:20px}
+.plan{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:30px;display:flex;flex-direction:column;gap:6px;transition:box-shadow .2s,border-color .2s}
+.plan.match{border:2px solid var(--accent);box-shadow:var(--shadow);padding:29px}
+.plan .tg{font-size:13px;font-weight:700;color:var(--accent);min-height:20px}
+.plan h3{font-size:26px;font-weight:800}
+.price{font-size:50px;font-weight:800;letter-spacing:-.03em;margin-top:8px;font-variant-numeric:tabular-nums;line-height:1.1}
+.price small{font-size:15px;font-weight:500;color:var(--muted);letter-spacing:0}
+.plan .for{color:var(--muted);font-size:15px}
+.plan ul{list-style:none;padding:0;margin:18px 0 26px;display:grid;gap:10px;font-size:15.5px;flex:1}
+.plan li{display:flex;gap:10px}
+.plan li::before{content:"";width:7px;height:7px;background:var(--accent);border-radius:50%;flex:none;margin-top:9px}
+.fine{margin-top:22px;color:var(--muted);font-size:14.5px}
+
+.faq{max-width:820px}
+details{border-top:1px solid var(--line);padding-block:20px}
+details:last-child{border-bottom:1px solid var(--line)}
+summary{cursor:pointer;font-weight:700;font-size:20px;letter-spacing:-.01em;list-style:none;display:flex;justify-content:space-between;gap:16px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--accent);font-size:26px;line-height:1}
+details[open] summary::after{content:"–"}
+details p{color:var(--muted);margin-top:12px;max-width:66ch}
+
+.final{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-radius:32px;padding:clamp(32px,6vw,72px);margin-block:10px 40px}
+.final h2{font-size:clamp(32px,5vw,56px);font-weight:800;max-width:16ch}
+.final p{margin-top:16px;max-width:52ch;font-size:18px;opacity:.92}
+.final .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+.final .btn{border-color:#fff;color:#fff}
+.final .btn.white{background:#fff;color:#222}
+.final .btn:not(.white):hover{background:rgba(255,255,255,.14)}
+
+footer{margin-inline:-20px;padding:36px 20px 44px;background:var(--surface);border-top:1px solid var(--line);font-size:14.5px;color:var(--muted)}
+footer .in{max-width:1180px;margin-inline:auto;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+footer nav{display:flex;gap:22px;flex-wrap:wrap}
+footer a{text-decoration:none}
+footer a:hover{text-decoration:underline}
+
+.rt{width:100%;border-collapse:collapse;min-width:520px;font-size:15px}
+.rt th,.rt td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+.rt th{font-size:12.5px;color:var(--muted);font-weight:700;background:var(--surface)}
+.rt tr:last-child td{border-bottom:0}
+.rt td:first-child{font-weight:600}
+.sendbox{margin-top:20px}
+.sendrow{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.sendrow input{flex:1;min-width:200px;border:1px solid var(--line);border-radius:999px;padding:10px 16px;font:inherit;font-size:15px;background:var(--card);color:var(--ink)}
+.sendrow input:focus{outline:none;border-color:var(--ink)}
+.chk{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:14.5px;cursor:pointer}
+.chk input{accent-color:var(--accent);width:18px;height:18px}
+.repcard{background:var(--surface);border-radius:24px;padding:22px}
+.repcard .ph{margin-bottom:12px}
+.repcard .scroll-x{background:var(--card)}
+
+.rule{display:flex;justify-content:space-between;align-items:center;gap:12px 20px;flex-wrap:wrap;padding:16px 0;border-top:1px solid var(--line)}
+.rule b{display:block;font-size:15.5px}
+.rule .sub{display:block;max-width:34ch}
+.rule .switch button{font-size:14px;padding:8px 14px}
+label.sub{display:block}
+.sel{border:1px solid var(--line);border-radius:12px;padding:12px 14px;font:inherit;font-size:15px;background:var(--card);color:var(--ink);width:100%;max-width:520px;margin-top:6px}
+.sel:focus{outline:none;border-color:var(--ink)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.plan{transition:none}}
+
+.auth-ov{position:fixed;inset:0;z-index:200;background:rgba(20,20,20,.5);display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-box{position:relative;background:var(--card);border-radius:24px;box-shadow:0 30px 70px rgba(0,0,0,.35);padding:32px;width:100%;max-width:420px;max-height:92vh;overflow:auto}
+.auth-x{position:absolute;top:16px;right:16px;background:none;border:none;font-size:18px;color:var(--muted);cursor:pointer;padding:4px}
+.auth-tabs{display:flex;gap:6px;background:var(--surface);border-radius:999px;padding:4px;margin-bottom:18px}
+.auth-tab{flex:1;border:none;background:none;border-radius:999px;padding:9px 10px;font:inherit;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer}
+.auth-tab.on{background:var(--card);color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.auth-box h3{margin:0 0 4px;font-size:22px;letter-spacing:-.02em}
+.auth-sub{margin:0 0 20px;color:var(--muted);font-size:14.5px}
+.fld{margin-bottom:14px}
+.fld label{display:block;font-size:13.5px;font-weight:700;margin-bottom:6px}
+.fld input{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 13px;font:inherit;font-size:15px;background:var(--card);color:var(--ink)}
+.fld input:focus{outline:none;border-color:var(--ink)}
+.auth-note{background:var(--warn-bg);color:var(--warn-ink);border-radius:12px;padding:10px 14px;font-size:14px;margin-bottom:14px}
+.auth-note.ok{background:var(--ok-bg);color:var(--ok-ink)}
+.auth-fine{font-size:12.5px;color:var(--muted);text-align:center;margin:12px 0 0}
+.btn.google{border-color:var(--line);background:var(--card);color:var(--ink);margin-bottom:14px}
+.btn.google:hover{background:var(--surface)}
+.auth-or{display:flex;align-items:center;gap:12px;margin:2px 0 16px;color:var(--muted);font-size:13px}
+.auth-or:before,.auth-or:after{content:"";flex:1;height:1px;background:var(--line)}
+</style>
+
+<div class="wrap" id="marketing-wrap">
+  <div class="top">
+    <header class="nav">
+      <a class="logo" href="#top">lety</a>
+      <nav class="navpill" aria-label="Navigation">
+        <a href="#demo">Démo</a>
+        <a href="#fonctions">Fonctions</a>
+        <a href="#tarifs">Tarifs</a>
+      </nav>
+      <div class="navr">
+        <a class="btn sm ghost" href="#" data-auth="collab">Espace Collaborateur</a>
+        <a class="btn sm ghost" href="#" data-auth="login">Espace Entreprise</a>
+        <a class="btn sm primary" href="#tarifs">S’abonner</a>
+      </div>
+    </header>
+  </div>
+
+  <main id="top">
+    <div class="hero">
+      <span class="badge">Pour les équipes de 3 à 30 personnes · dès 9,90 € HT par mois</span>
+      <h1>La gestion d’équipe, <em>enfin simple.</em></h1>
+      <p class="lead">Lety centralise le planning, les demandes de congés, le suivi des heures travaillées, la gestion RH et la messagerie interne de votre équipe de 3 à 30 personnes — et prépare chaque mois le compte rendu pour votre comptable, selon les règles de votre convention collective.</p>
+
+      <form class="pill" id="est" aria-label="Estimer mon offre">
+        <div class="seg"><label for="n">Combien de salariés ?</label><input id="n" type="number" min="1" max="500" value="8" inputmode="numeric"></div>
+        <div class="seg"><span class="l">Votre offre</span><strong id="offer" class="tnum">Équipe · 19,90 € HT / mois</strong></div>
+        <a class="btn primary go" href="#tarifs" id="go-btn">Voir l’offre</a>
+      </form>
+
+      <div class="demo" id="demo">
+        <div class="switch" role="group" aria-label="Choisir l’espace à essayer">
+          <button type="button" id="r-admin" aria-pressed="true">Espace administrateur</button>
+          <button type="button" id="r-emp" aria-pressed="false">Espace salarié</button>
+        </div>
+        <p class="hint">Démo interactive avec des données d’exemple : cliquez, écrivez un message, posez un congé.</p>
+        <div class="app">
+          <nav class="side" id="side" aria-label="Menu de l’application"></nav>
+          <div class="main" id="main"></div>
+        </div>
+      </div>
+    </div>
+
+    <section id="pourquoi">
+      <div class="sec-head">
+        <span class="eyebrow">Ce que Lety remplace</span>
+        <h2>Fini le planning qui vit dans trois endroits à la fois.</h2>
+      </div>
+      <div class="replace">
+        <div><h3><s>Le tableur partagé</s></h3><p>Celui qu’on écrase par erreur le dimanche soir, avec dix versions « final_v3 ».</p></div>
+        <div><h3><s>Le groupe WhatsApp</s></h3><p>« Quelqu’un peut me remplacer jeudi ? » noyé sous les photos et les réponses en retard.</p></div>
+        <div><h3><s>Le cahier à la caisse</s></h3><p>Lisible sur place uniquement, impossible à consulter depuis chez soi.</p></div>
+      </div>
+    </section>
+
+    <section id="fonctions" style="padding-top:20px">
+      <div class="sec-head">
+        <span class="eyebrow">Fonctions</span>
+        <h2>Pensé pour les petites équipes de commerce.</h2>
+        <p>Un espace pour vous, un espace pour chaque salarié, et une messagerie pour que tout se dise au même endroit.</p>
+      </div>
+      <div class="feat">
+        <article class="fc"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="10" width="8" height="11" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/></svg></div><h3>Espace administrateur</h3><p>Construisez la semaine, publiez le planning, validez les congés et gardez la fiche de chaque salarié sous la main.</p></article>
+        <article class="fc"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg></div><h3>Espace salarié</h3><p>Chacun consulte ses horaires depuis son téléphone, pose ses congés et suit son solde, sans vous appeler.</p></article>
+        <article class="fc"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg></div><h3>Messagerie interne</h3><p>Des annonces à toute l’équipe et des messages directs, au même endroit que le planning. Vos échanges de créneaux ne se perdent plus.</p></article>
+        <article class="fc"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></div><h3>Suivi mensuel des congés payés</h3><p>Chaque mois, les congés acquis, pris et restants de chaque salarié sont à jour. Fini le calcul à la main.</p></article>
+        <article class="fc"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/></svg></div><h3>Plusieurs boutiques, un planning</h3><p>Un salarié qui tourne entre deux points de vente apparaît une seule fois, avec le bon lieu sur chaque créneau.</p></article>
+        <article class="fc"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></div><h3>Adapté à votre convention collective</h3><p>Jours ouvrés ou ouvrables, période de référence des congés, congés d’ancienneté, majoration des heures : vous réglez les règles de votre convention, Lety les applique.</p></article>
+      </div>
+      <div class="limit">
+        <div><h3>Volontairement limité</h3><p>Lety ne fait ni paie ni facturation : votre comptable garde son logiciel. Lety se concentre sur ce qui vous pose problème chaque semaine (qui travaille, quand, combien de congés il reste) et lui prépare les éléments chaque mois.</p></div>
+      </div>
+    </section>
+
+    <section id="comptable" style="padding-top:20px">
+      <div class="origin">
+        <div class="sec-head" style="margin-bottom:0">
+          <span class="eyebrow">Compte rendu mensuel</span>
+          <h2>Chaque mois, votre comptable reçoit tout. Sans que vous ayez à le compiler.</h2>
+          <p>Heures travaillées, congés payés acquis et pris, soldes, absences : Lety prépare le compte rendu de chaque salarié selon les règles de votre convention collective, et vous l’envoyez à votre comptable en un clic. Fini les récapitulatifs refaits à la main le 30 au soir.</p>
+        </div>
+        <div class="repcard" aria-label="Exemple de compte rendu mensuel">
+          <div class="ph"><strong>Compte rendu · septembre 2026</strong><span class="tag ok">Prêt à envoyer</span></div>
+          <div id="rep-static"></div>
+          <p class="sub" style="margin-top:10px">Exemple de données</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="comment" style="padding-top:20px">
+      <div class="sec-head">
+        <span class="eyebrow">Comment ça marche</span>
+        <h2>Prêt en trois étapes.</h2>
+        <p>Pas d’installation, pas de formation.</p>
+      </div>
+      <div class="steps">
+        <div class="step"><span class="n">1</span><h3>Vous vous connectez</h3><p>Vous créez votre compte avec votre e-mail et vous arrivez directement sur votre espace administrateur.</p></div>
+        <div class="step"><span class="n">2</span><h3>Vous choisissez votre offre</h3><p>Trois offres selon le nombre de salariés. Vous indiquez ensuite votre convention collective, et Lety en applique les règles.</p></div>
+        <div class="step"><span class="n">3</span><h3>Vous ajoutez vos salariés</h3><p>Une fiche par personne : contrat, plages horaires, jours de repos. Chacun reçoit son propre espace.</p></div>
+      </div>
+    </section>
+
+    <section id="origine" style="padding-top:20px">
+      <div class="origin">
+        <div class="sec-head" style="margin-bottom:0">
+          <span class="eyebrow">D’où vient Lety</span>
+          <h2>Né dans de vraies boutiques, pas dans un bureau.</h2>
+          <p>Lety est né dans un réseau de quatre boutiques, créé par son dirigeant pour gérer sa propre équipe : peu de monde, des horaires qui bougent, des congés à caler sans laisser un magasin vide. Pas de jargon RH ni de grand groupe derrière : un outil pensé par quelqu’un qui a les mêmes problèmes que vous.</p>
+        </div>
+        <div class="figs">
+          <div><strong>4</strong><span>boutiques utilisent le planning au quotidien</span></div>
+          <div><strong>~10</strong><span>salariés planifiés</span></div>
+          <div><strong>3–30</strong><span>personnes : la taille d’équipe visée</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tarifs">
+      <div class="sec-head">
+        <span class="eyebrow">Tarifs</span>
+        <h2>Le prix dépend du nombre de salariés.</h2>
+        <p>Toutes les fonctions sont incluses dans chaque offre : seule la taille de l’équipe change.</p>
+      </div>
+      <div class="plans" id="plans">
+        <div class="plan" data-i="0">
+          <span class="tg">&nbsp;</span>
+          <h3>Essentiel</h3>
+          <div class="price">9,90 €<small> HT / mois</small></div>
+          <p class="for">Pour une petite équipe.</p>
+          <ul>
+            <li>Jusqu’à 5 salariés</li>
+            <li>Planning, congés et suivi des CP</li>
+            <li>Compte rendu mensuel pour le comptable</li>
+            <li>Espaces administrateur et salarié</li>
+            <li>Messagerie interne</li>
+          </ul>
+          <a class="btn" href="#tarifs" data-auth="signup" data-plan="essentiel">Choisir Essentiel</a>
+        </div>
+        <div class="plan" data-i="1">
+          <span class="tg">Le plus choisi</span>
+          <h3>Équipe</h3>
+          <div class="price">19,90 €<small> HT / mois</small></div>
+          <p class="for">Pour une équipe qui grandit.</p>
+          <ul>
+            <li>Jusqu’à 15 salariés</li>
+            <li>Planning, congés et suivi des CP</li>
+            <li>Compte rendu mensuel pour le comptable</li>
+            <li>Espaces administrateur et salarié</li>
+            <li>Messagerie interne</li>
+          </ul>
+          <a class="btn primary" href="#tarifs" data-auth="signup" data-plan="equipe">Choisir Équipe</a>
+        </div>
+        <div class="plan" data-i="2">
+          <span class="tg">&nbsp;</span>
+          <h3>Réseau</h3>
+          <div class="price">29,90 €<small> HT / mois</small></div>
+          <p class="for">Pour plusieurs boutiques.</p>
+          <ul>
+            <li>Jusqu’à 30 salariés</li>
+            <li>Planning, congés et suivi des CP</li>
+            <li>Compte rendu mensuel pour le comptable</li>
+            <li>Espaces administrateur et salarié</li>
+            <li>Messagerie interne</li>
+          </ul>
+          <a class="btn" href="#tarifs" data-auth="signup" data-plan="reseau">Choisir Réseau</a>
+        </div>
+      </div>
+      <p class="fine">Prix mensuels hors taxes (HT). Au-delà de 30 salariés, <a href="mailto:contact@letyapp.fr?subject=Offre%20Lety%20sur%20mesure" style="color:var(--accent);font-weight:600">contactez-nous</a> pour une offre adaptée.</p>
+    </section>
+
+    <section id="faq" style="padding-top:20px">
+      <div class="sec-head">
+        <span class="eyebrow">Questions fréquentes</span>
+        <h2>Ce qu’on nous demande avant de se lancer.</h2>
+      </div>
+      <div class="faq">
+        <details><summary>Comment je commence ?</summary><p>Vous créez votre compte, vous choisissez votre offre, puis vous ajoutez vos salariés avec leurs horaires. Vous pouvez construire votre premier planning dans la foulée.</p></details>
+        <details><summary>Comment mes salariés accèdent-ils à leur planning ?</summary><p>Chaque salarié a son propre espace, depuis le navigateur de son téléphone ou de son ordinateur. Il n’y a rien à installer.</p></details>
+        <details><summary>La messagerie remplace-t-elle WhatsApp ?</summary><p>Elle sert à tout ce qui concerne le travail : annonces, échanges de créneaux, questions sur le planning. Vos salariés n’ont plus besoin de partager leur numéro personnel.</p></details>
+        <details><summary>Lety gère-t-il ma convention collective ?</summary><p>Les règles changent d’une convention à l’autre : décompte en jours ouvrés ou ouvrables, période de référence des congés payés, congés d’ancienneté, majoration des heures supplémentaires. Vous indiquez votre convention et vous réglez ces règles dans vos réglages ; Lety les applique ensuite à chaque compte rendu. Votre comptable peut les valider avant le premier envoi.</p></details>
+        <details><summary>Que contient le compte rendu mensuel ?</summary><p>Pour chaque salarié : les heures travaillées, les congés payés acquis, pris et restants, et les absences du mois. Vous l’envoyez à votre comptable directement depuis Lety.</p></details>
+        <details><summary>Lety fait-il la paie ou la facturation ?</summary><p>Non, et c’est voulu. Lety gère l’équipe : les plannings, les congés, le suivi des congés payés et la messagerie. Pour la paie, votre comptable garde son logiciel ; Lety lui prépare le compte rendu de chaque mois.</p></details>
+        <details><summary>Pour quelles équipes Lety est-il fait ?</summary><p>Pour les petites structures de 3 à 30 personnes, en particulier les commerces avec un ou plusieurs points de vente. Pour des équipes de plusieurs centaines de personnes, il existe des outils plus lourds, mieux adaptés.</p></details>
+        <details><summary>Lety est en bêta : que cela veut dire ?</summary><p>L’outil fonctionne déjà au quotidien dans nos propres boutiques, mais il évolue vite. Les équipes qui rejoignent la bêta influencent directement ce que nous construisons ensuite.</p></details>
+        <details><summary>Que deviennent mes données si j’arrête ?</summary><p>Elles restent les vôtres. Vous pouvez résilier votre abonnement à tout moment depuis votre espace client.</p></details>
+      </div>
+    </section>
+
+    <section id="rejoindre" style="padding-block:20px 0">
+      <div class="final">
+        <h2>Votre prochain planning en dix minutes.</h2>
+        <p>Rejoignez la bêta : vous créez votre espace, vous ajoutez votre équipe, et vous nous dites franchement ce qui manque.</p>
+        <div class="cta">
+          <a class="btn white" href="#tarifs" data-auth="signup" data-plan="equipe">Créer mon espace</a>
+          <a class="btn" href="#demo">Revoir la démo</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="in">
+      <span><strong style="color:var(--ink)">lety</strong> · La gestion d’équipe, enfin simple</span>
+      <nav><a href="#demo">Démo</a><a href="#fonctions">Fonctions</a><a href="#tarifs">Tarifs</a><a href="#faq">Questions</a></nav>
+    </div>
+  </footer>
+</div>
+
+<div class="auth-ov" id="auth-ov" hidden>
+  <div class="auth-box" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <button type="button" class="auth-x" id="auth-close" aria-label="Fermer">✕</button>
+
+    <div id="auth-panel-entreprise">
+      <div class="auth-tabs" role="tablist">
+        <button type="button" class="auth-tab" data-mode="signup" role="tab">Créer mon espace</button>
+        <button type="button" class="auth-tab" data-mode="login" role="tab">Se connecter</button>
+      </div>
+      <h3 id="auth-title">Créer votre espace</h3>
+      <p class="auth-sub" id="auth-sub">Vous devenez administrateur de votre entreprise sur Lety.</p>
+      <button type="button" class="btn google" id="auth-google" style="width:100%;justify-content:center;gap:10px">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.26c-.81.54-1.84.86-3.05.86-2.35 0-4.34-1.58-5.05-3.71H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.71A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04l2.99-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.96l2.99 2.33C4.66 5.16 6.65 3.58 9 3.58z"/></svg>
+        <span id="auth-google-txt">Continuer avec Google</span>
+      </button>
+      <div class="auth-or"><span>ou avec votre e-mail</span></div>
+      <form id="auth-form">
+        <div class="fld" id="fld-company"><label for="a-company">Nom de l’entreprise</label><input id="a-company" type="text" autocomplete="organization" required></div>
+        <div class="fld" id="fld-plan"><label for="a-plan">Offre</label>
+          <select id="a-plan" class="sel">
+            <option value="essentiel">Essentiel · 9,90 € HT / mois · jusqu’à 5 salariés</option>
+            <option value="equipe">Équipe · 19,90 € HT / mois · jusqu’à 15 salariés</option>
+            <option value="reseau">Réseau · 29,90 € HT / mois · jusqu’à 30 salariés</option>
+          </select>
+        </div>
+        <div class="fld"><label for="a-email">E-mail</label><input id="a-email" type="email" autocomplete="email" required></div>
+        <div class="fld"><label for="a-pass">Mot de passe</label><input id="a-pass" type="password" autocomplete="new-password" minlength="6" required></div>
+        <button type="button" id="auth-forgot" style="display:none;border:0;background:none;color:var(--accent);font-weight:700;font-size:13.5px;cursor:pointer;padding:0 0 14px;text-decoration:underline">Mot de passe oublié ?</button>
+        <div class="auth-note" id="auth-note" hidden></div>
+        <button type="submit" class="btn primary" id="auth-submit" style="width:100%;justify-content:center">Créer mon espace</button>
+        <p class="auth-fine" id="auth-fine">Le paiement (Stripe) sera activé à l’étape suivante ; votre compte est créé dès maintenant, en mode bêta.</p>
+      </form>
+      <button type="button" id="switch-to-collab" style="width:100%;text-align:center;border:0;background:none;color:var(--muted);font-weight:700;font-size:13.5px;cursor:pointer;padding:6px 0 0;text-decoration:underline">Vous êtes salarié ? Accédez à votre espace</button>
+    </div>
+
+    <div id="auth-panel-collab" hidden>
+      <h3>Espace Collaborateur</h3>
+      <p class="auth-sub">Connectez-vous avec le code entreprise, l’identifiant et le mot de passe transmis par votre employeur.</p>
+      <form id="emp-login-form">
+        <div class="fld"><label for="el-code">Code entreprise</label><input id="el-code" type="text" autocapitalize="characters" required></div>
+        <div class="fld"><label for="el-id">Identifiant</label><input id="el-id" type="text" required></div>
+        <div class="fld"><label for="el-pass">Mot de passe</label><input id="el-pass" type="password" autocomplete="current-password" required></div>
+        <div class="auth-note" id="emp-login-note" hidden></div>
+        <button type="submit" class="btn primary" id="emp-login-submit" style="width:100%;justify-content:center">Se connecter</button>
+      </form>
+      <button type="button" id="switch-to-entreprise" style="width:100%;text-align:center;border:0;background:none;color:var(--muted);font-weight:700;font-size:13.5px;cursor:pointer;padding:6px 0 0;text-decoration:underline">Vous êtes le gérant ? Espace Entreprise</button>
+    </div>
+
+  </div>
+</div>
+
+<div id="app-root" hidden>
+  <div class="top">
+    <header class="nav">
+      <a class="logo" href="#top" id="app-logo">lety</a>
+      <div class="navr">
+        <span id="app-company" class="sub" style="font-weight:600;color:var(--ink)"></span>
+        <button type="button" class="btn sm ghost" id="app-logout">Se déconnecter</button>
+      </div>
+    </header>
+  </div>
+  <div class="wrap" style="padding-block:32px">
+    <div class="app-tabs" style="display:flex;gap:8px;margin-bottom:28px">
+      <button type="button" class="btn sm primary" id="app-tab-planning" data-apptab="planning">Planning</button>
+      <button type="button" class="btn sm" id="app-tab-equipe" data-apptab="equipe">Équipe</button>
+      <button type="button" class="btn sm" id="app-tab-conges" data-apptab="conges">Congés</button>
+    </div>
+
+    <div id="app-view-planning">
+      <div class="sec-head">
+        <span class="eyebrow">Planning</span>
+        <h2>Planning de la semaine</h2>
+        <p class="sub" id="app-week-label"></p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:18px">
+        <button type="button" class="btn sm" id="app-week-prev">‹ Semaine précédente</button>
+        <button type="button" class="btn sm" id="app-week-next">Semaine suivante ›</button>
+      </div>
+      <div class="scroll-x">
+        <div id="app-plan-grid"></div>
+      </div>
+      <div id="app-shift-editor" class="fiche" hidden style="margin-top:20px;max-width:420px">
+        <h4 id="app-shift-title">Créneau</h4>
+        <div class="fld"><label for="sh-start">Début</label><input id="sh-start" type="time" value="09:00"></div>
+        <div class="fld"><label for="sh-end">Fin</label><input id="sh-end" type="time" value="17:00"></div>
+        <div class="fld"><label for="sh-boutique">Boutique</label><input id="sh-boutique" type="text" placeholder="Centre, Nord, Gare…"></div>
+        <div class="auth-note" id="app-shift-note" hidden></div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button type="button" class="btn primary" id="app-shift-save">Enregistrer</button>
+          <button type="button" class="btn" id="app-shift-delete" hidden>Supprimer</button>
+          <button type="button" class="btn ghost" id="app-shift-cancel">Annuler</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="app-view-equipe" hidden>
+      <div class="sec-head">
+        <span class="eyebrow">Équipe</span>
+        <h2>Vos salariés</h2>
+        <p>Ajoutez vos salariés pour commencer à construire votre planning. C’est la première étape.</p>
+        <p class="sub" id="app-company-code" style="font-weight:700;color:var(--ink)"></p>
+      </div>
+      <div class="eq">
+        <div>
+          <div id="app-emp-list"></div>
+        </div>
+        <div class="fiche">
+          <h4>Ajouter un salarié</h4>
+          <form id="app-emp-form">
+            <div class="fld"><label for="e-name">Nom</label><input id="e-name" type="text" required></div>
+            <div class="fld"><label for="e-role">Poste</label><input id="e-role" type="text" placeholder="Vendeuse, vendeur…" required></div>
+            <div class="fld"><label for="e-boutique">Boutique</label><input id="e-boutique" type="text" placeholder="Centre, Nord, Gare…"></div>
+            <div class="fld"><label for="e-hours">Contrat (heures / semaine)</label><input id="e-hours" type="number" min="1" max="48" value="35"></div>
+            <div class="fld"><label for="e-loginid">Identifiant de connexion (accès salarié, facultatif)</label><input id="e-loginid" type="text" placeholder="Ex : alan"></div>
+            <div class="fld"><label for="e-loginpass">Mot de passe</label><input id="e-loginpass" type="text" placeholder="Laissez vide = pas d’accès"></div>
+            <p class="sub" style="margin:-4px 0 14px">Si vous renseignez un identifiant et un mot de passe, donnez-les à ce salarié avec le code entreprise ci-dessus : il pourra se connecter depuis « Espace Collaborateur » pour voir son planning et demander des congés (validation obligatoire de votre part pour le moment).</p>
+            <div class="auth-note" id="app-emp-note" hidden></div>
+            <button type="submit" class="btn primary" id="app-emp-submit" style="width:100%;justify-content:center">Ajouter ce salarié</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="app-view-conges" hidden>
+      <div class="sec-head">
+        <span class="eyebrow">Congés</span>
+        <h2>Demandes de congés</h2>
+        <p>Validez ou refusez les demandes envoyées par vos salariés depuis leur espace.</p>
+      </div>
+      <div id="app-conges-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="emp-root" hidden>
+  <div class="top">
+    <header class="nav">
+      <a class="logo" href="#top" id="emp-logo">lety</a>
+      <div class="navr">
+        <span id="emp-company" class="sub" style="font-weight:600;color:var(--ink)"></span>
+        <button type="button" class="btn sm ghost" id="emp-logout">Se déconnecter</button>
+      </div>
+    </header>
+  </div>
+  <div class="wrap" style="padding-block:32px">
+    <div class="app-tabs" style="display:flex;gap:8px;margin-bottom:28px">
+      <button type="button" class="btn sm primary" id="emp-tab-planning" data-emptab="planning">Mon planning</button>
+      <button type="button" class="btn sm" id="emp-tab-conges" data-emptab="conges">Mes congés</button>
+    </div>
+
+    <div id="emp-view-planning">
+      <div class="sec-head">
+        <span class="eyebrow">Planning</span>
+        <h2 id="emp-name-title">Mon planning</h2>
+        <p class="sub" id="emp-week-label"></p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:18px">
+        <button type="button" class="btn sm" id="emp-week-prev">‹ Semaine précédente</button>
+        <button type="button" class="btn sm" id="emp-week-next">Semaine suivante ›</button>
+      </div>
+      <div id="emp-plan-list"></div>
+    </div>
+
+    <div id="emp-view-conges" hidden>
+      <div class="sec-head">
+        <span class="eyebrow">Congés</span>
+        <h2>Mes demandes</h2>
+        <p>Vos demandes doivent être validées par votre administrateur avant d’apparaître dans votre planning.</p>
+      </div>
+      <div class="eq">
+        <div>
+          <div id="emp-conges-list"></div>
+        </div>
+        <div class="fiche">
+          <h4>Nouvelle demande</h4>
+          <form id="emp-conges-form">
+            <div class="fld"><label for="c-start">Du</label><input id="c-start" type="date" required></div>
+            <div class="fld"><label for="c-end">Au</label><input id="c-end" type="date" required></div>
+            <div class="fld"><label for="c-note">Message (facultatif)</label><input id="c-note" type="text" placeholder="Précision pour votre responsable…"></div>
+            <div class="auth-note" id="emp-conges-note" hidden></div>
+            <button type="submit" class="btn primary" id="emp-conges-submit" style="width:100%;justify-content:center">Envoyer la demande</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  function esc(t){return String(t).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];});}
+  function fmt(n){return (n%1?n.toFixed(1).replace(".",","):String(n));}
+
+  /* ---------- Estimateur ---------- */
+  var offers=[["Essentiel","9,90 €"],["Équipe","19,90 €"],["Réseau","29,90 €"]];
+  function planIdx(n){return n<=5?0:(n<=15?1:(n<=30?2:3));}
+  function est(){
+    var n=parseInt($("n").value,10),out=$("offer"),cards=document.querySelectorAll(".plan"),go=$("go-btn");
+    var i=(isNaN(n)||n<1)?-1:planIdx(n);
+    if(i===-1){out.textContent="Indiquez un nombre";}
+    else if(i===3){
+      out.textContent="Plus de 30 ? Parlons-en ensemble";
+      if(go){go.textContent="Nous contacter";go.href="mailto:contact@letyapp.fr?subject="+encodeURIComponent("Offre Lety pour "+n+" salariés");}
+    }
+    else{
+      out.textContent=offers[i][0]+" · "+offers[i][1]+" HT / mois";
+      if(go){go.textContent="Voir l’offre";go.href="#tarifs";}
+    }
+    for(var k=0;k<cards.length;k++){cards[k].classList.toggle("match",k===i);}
+  }
+  $("n").addEventListener("input",est);
+  $("est").addEventListener("submit",function(e){e.preventDefault();location.hash="#tarifs";});
+  est();
+
+  /* ---------- Démo ---------- */
+  var days=["Lun 12","Mar 13","Mer 14","Jeu 15","Ven 16","Sam 17","Dim 18"];
+  var people=[
+    {n:"Léa",r:"Vendeuse",b:"Centre",h:"35 h / semaine",p:["Lun–Ven 9h–19h","Sam 10h–19h"],x:["Mer","Dim"],s:"03/2023",cp:"12,5 j"},
+    {n:"Karim",r:"Vendeur",b:"Gare",h:"35 h / semaine",p:["Lun–Sam 10h–19h"],x:["Mar","Dim"],s:"09/2021",cp:"18 j"},
+    {n:"Sonia",r:"Vendeuse",b:"Nord",h:"28 h / semaine",p:["Mar–Sam 13h–20h"],x:["Lun","Ven","Dim"],s:"01/2024",cp:"6,5 j"},
+    {n:"Tom",r:"Vendeur",b:"Gare",h:"35 h / semaine",p:["Lun–Sam 10h–19h"],x:["Dim"],s:"06/2022",cp:"22 j"}
+  ];
+  var rows=[
+    [["a","9h–17h","Centre"],["a","9h–17h","Centre"],null,["b","12h–19h","Nord"],["b","12h–19h","Nord"],["a","10h–19h","Centre"],null],
+    [["c","10h–18h","Gare"],null,["c","10h–18h","Gare"],["c","10h–18h","Gare"],["c","10h–18h","Gare"],["c","10h–19h","Gare"],null],
+    [null,["b","13h–20h","Nord"],["b","13h–20h","Nord"],["b","13h–20h","Nord"],null,["b","13h–20h","Nord"],null],
+    [["off"],["off"],["off"],["off"],["off"],["c","10h–19h","Gare"],null]
+  ];
+  var S={
+    role:"admin",tab:"planning",published:false,set:{conv:"legal",count:"ouvrables",ref:"jun",anc:"none",maj:"legal"},report:{to:"comptable@cabinet-exemple.fr",sent:null,auto:false,err:null},sel:0,thread:"team",rs:null,re:null,sent:null,focus:false,
+    leaves:[
+      {who:"Sonia",label:"19 au 21 octobre",days:3,st:"p"},
+      {who:"Karim",label:"26 au 30 octobre",days:5,st:"p"}
+    ],
+    msgs:{
+      team:[
+        {f:"admin",n:"Camille",t:"Planning de la semaine du 12 publié. Vérifiez vos horaires.",h:"09:12"},
+        {f:"karim",n:"Karim",t:"Bien reçu, merci !",h:"09:20"}
+      ],
+      dm:[
+        {f:"emp",n:"Léa",t:"Bonjour Camille, je peux échanger mon jeudi avec Sonia ?",h:"10:04"},
+        {f:"admin",n:"Camille",t:"Oui si Sonia est d’accord, je valide côté planning.",h:"10:11"}
+      ]
+    }
+  };
+  var tabs={
+    admin:[["planning","Planning"],["equipe","Équipe"],["conges","Congés"],["compte","Compte rendu"],["reglages","Réglages"],["messages","Messages"]],
+    emp:[["planning","Mon planning"],["conges","Mes congés"],["messages","Messages"]]
+  };
+  function pending(){return S.leaves.filter(function(l){return l.st==="p";}).length;}
+
+  function side(){
+    var me=S.role==="admin"?["C","Camille","Responsable"]:["L","Léa","Vendeuse · Centre"];
+    var h='<div class="me"><span class="av">'+me[0]+'</span><div><b>'+me[1]+'</b><small>'+me[2]+'</small></div></div>';
+    tabs[S.role].forEach(function(t){
+      var badge="";
+      if(S.role==="admin"&&t[0]==="conges"&&pending()){badge="<em>"+pending()+"</em>";}
+      h+='<button type="button" class="nv'+(S.tab===t[0]?" on":"")+'" data-act="tab" data-v="'+t[0]+'">'+t[1]+badge+"</button>";
+    });
+    return h;
+  }
+
+  function legend(){
+    return '<div class="legend"><span><i style="background:var(--s1);border-color:var(--s1-line)"></i>Boutique Centre</span><span><i style="background:var(--s2);border-color:var(--s2-line)"></i>Boutique Nord</span><span><i style="background:var(--s3);border-color:var(--s3-line)"></i>Boutique Gare</span></div>';
+  }
+  function grid(){
+    var h='<div class="pl"><div class="h">Équipe</div>';
+    days.forEach(function(d){h+='<div class="h">'+d+"</div>";});
+    people.forEach(function(p,i){
+      h+='<div class="who"><i>'+p.n.charAt(0)+"</i>"+p.n+"</div>";
+      rows[i].forEach(function(c){
+        if(!c){h+="<div></div>";}
+        else if(c[0]==="off"){h+='<div><div class="shift off">Congé</div></div>';}
+        else{h+='<div><div class="shift '+c[0]+'">'+c[1]+"<small>"+c[2]+"</small></div></div>";}
+      });
+    });
+    return h+"</div>";
+  }
+
+  function pAdminPlanning(){
+    return '<div class="ph"><div><h3>Semaine du 12 au 18 octobre</h3><p class="sub">'+(S.published?"Planning publié : vos salariés le voient dans leur espace.":"Brouillon : pas encore visible par les salariés.")+'</p></div>'+
+      '<button type="button" class="btn sm '+(S.published?"":"primary")+'" data-act="publish">'+(S.published?"Publié ✓":"Publier aux salariés")+"</button></div>"+
+      legend()+'<div class="scroll-x">'+grid()+"</div>";
+  }
+  function pEquipe(){
+    var p=people[S.sel];
+    var list=people.map(function(q,i){
+      return '<button type="button" class="pp'+(i===S.sel?" on":"")+'" data-act="sel" data-v="'+i+'"><span class="av">'+q.n.charAt(0)+'</span><span><b>'+q.n+"</b><small>"+q.r+" · "+q.b+"</small></span></button>";
+    }).join("");
+    var chips=function(a){return a.map(function(x){return '<span class="chip">'+x+"</span>";}).join("");};
+    return '<div class="ph"><div><h3>Équipe</h3><p class="sub">'+people.length+' salariés · une fiche par personne</p></div></div>'+
+      '<div class="eq"><div>'+list+'</div><div class="fiche"><h4>Fiche de '+p.n+"</h4><dl>"+
+      "<div><dt>Poste</dt><dd>"+p.r+"</dd></div>"+
+      "<div><dt>Boutique</dt><dd>"+p.b+"</dd></div>"+
+      "<div><dt>Contrat</dt><dd>"+p.h+"</dd></div>"+
+      "<div><dt>Plages horaires</dt><dd>"+chips(p.p)+"</dd></div>"+
+      "<div><dt>Jours de repos</dt><dd>"+chips(p.x)+"</dd></div>"+
+      "<div><dt>Date d’entrée</dt><dd>"+p.s+"</dd></div>"+
+      "<div><dt>Convention collective</dt><dd>"+esc(convs[S.set.conv])+"</dd></div>"+
+      "<div><dt>Congés payés restants</dt><dd>"+p.cp+"</dd></div>"+
+      "</dl></div></div>";
+  }
+  function pAdminLeaves(){
+    var n=pending();
+    var h='<div class="ph"><div><h3>Congés</h3><p class="sub">'+(n?n+(n>1?" demandes à traiter":" demande à traiter"):"Aucune demande en attente")+"</p></div></div>";
+    S.leaves.forEach(function(l,i){
+      var tag=l.st==="p"?'<span class="tag p">En attente</span>':(l.st==="ok"?'<span class="tag ok">Validé</span>':'<span class="tag no">Refusé</span>');
+      var acts=l.st==="p"?'<button type="button" class="btn sm primary" data-act="leave" data-i="'+i+'" data-v="ok">Valider</button><button type="button" class="btn sm" data-act="leave" data-i="'+i+'" data-v="no">Refuser</button>':"";
+      h+='<div class="lv"><div><b>'+esc(l.who)+'</b><span class="sub">'+esc(l.label)+" · "+l.days+(l.days>1?" jours":" jour")+'</span></div><div class="acts">'+tag+acts+"</div></div>";
+    });
+    return h+'<p class="sub" style="margin-top:14px">Les soldes de congés payés sont mis à jour chaque mois pour chaque salarié.</p>';
+  }
+  function pEmpPlanning(){
+    var h='<div class="ph"><div><h3>Mon planning</h3><p class="sub">'+(S.published?"Semaine du 12 au 18 octobre":"Le planning de la semaine n’est pas encore publié. Passez côté administrateur et cliquez sur « Publier ».")+"</p></div></div>";
+    if(!S.published){return h+'<div class="note">En attente de publication par votre responsable.</div>';}
+    days.forEach(function(d,i){
+      var c=rows[0][i];
+      h+='<div class="dr"><span class="d">'+d+"</span>"+(c?'<span class="shift '+c[0]+'">'+c[1]+"<small>Boutique "+c[2]+"</small></span>":'<span class="rest">Repos</span>')+"</div>";
+    });
+    return h;
+  }
+  function span(){
+    if(S.rs===null){return 0;}
+    var e=S.re===null?S.rs:S.re,n=0;
+    for(var d=S.rs;d<=e;d++){var w=(d-1+3)%7;if(w!==6&&!(S.set.count==="ouvres"&&w===5)){n++;}}
+    return n;
+  }
+  function rangeLabel(){
+    var e=S.re===null?S.rs:S.re;
+    return S.rs===e?S.rs+" octobre":S.rs+" au "+e+" octobre";
+  }
+  function pEmpLeaves(){
+    var head=["L","M","M","J","V","S","D"].map(function(x){return '<div class="dn">'+x+"</div>";}).join("");
+    var cells="",i;
+    for(i=0;i<3;i++){cells+="<div></div>";}
+    for(var d=1;d<=31;d++){
+      var sun=((d-1+3)%7)===6,cls="dy";
+      var e=S.re===null?S.rs:S.re;
+      if(S.rs!==null){
+        if(d===S.rs){cls+=" st";}
+        else if(d===e){cls+=" en";}
+        else if(d>S.rs&&d<e){cls+=" in";}
+      }
+      cells+='<button type="button" class="'+cls+'" data-act="day" data-v="'+d+'"'+(sun?" disabled":"")+">"+d+"</button>";
+    }
+    var days_=span(),after=12.5-days_;
+    var sum='<div class="sum"><span class="sub">Solde de congés payés</span><div class="big tnum" style="margin-top:6px">'+fmt(S.rs===null?12.5:after)+' j</div>'+
+      '<div class="row"><span>Période</span><span>'+(S.rs===null?"Choisissez vos dates":rangeLabel())+"</span></div>"+
+      '<div class="row"><span>Jours '+(S.set.count==="ouvres"?"ouvrés":"ouvrables")+'</span><span class="tnum">'+(S.rs===null?"–":days_)+"</span></div>"+
+      '<button type="button" class="btn primary" style="width:100%;margin-top:14px" data-act="send"'+(S.rs===null?" disabled":"")+">Envoyer la demande</button>";
+    if(S.sent){sum+='<div class="note">Demande envoyée pour '+esc(S.sent)+'. Elle apparaît dans l’espace administrateur. <button type="button" data-act="role" data-v="admin">Voir côté administrateur</button></div>';}
+    sum+="</div>";
+    return '<div class="ph"><div><h3>Mes congés</h3><p class="sub">Cliquez sur un premier jour, puis sur un dernier jour.</p></div></div>'+
+      '<div class="cw"><div><div class="cal-h">Octobre 2026</div><div class="cg">'+head+cells+"</div></div>"+sum+"</div>";
+  }
+  var repRows=[["Léa","152 h","2,5","0","12,5","0"],["Karim","152 h","2,5","3","18","0"],["Sonia","121 h","2,5","0","6,5","1"],["Tom","152 h","2,5","5","22","0"]];
+  var convs={legal:"Code du travail (règles légales)",detail:"Commerce de détail non alimentaire",hcr:"Hôtels, cafés, restaurants",alim:"Commerces de détail et de gros à prédominance alimentaire",boul:"Boulangerie-pâtisserie artisanale",coif:"Coiffure et professions connexes",autre:"Autre convention (à renseigner)"};
+  function acq(){return S.set.count==="ouvres"?"2,08":"2,5";}
+  function reportHtml(){
+    var h='<div class="scroll-x"><table class="rt"><thead><tr><th>Salarié</th><th>Heures</th><th>CP acquis (j)</th><th>CP pris (j)</th><th>Solde CP (j)</th><th>Absences (j)</th></tr></thead><tbody>';
+    repRows.forEach(function(r){h+="<tr><td>"+r[0]+"</td>"+[r[1],acq(),r[3],r[4],r[5]].map(function(x){return '<td class="tnum">'+x+"</td>";}).join("")+"</tr>";});
+    return h+"</tbody></table></div>";
+  }
+  function pReport(){
+    var R=S.report;
+    var h='<div class="ph"><div><h3>Compte rendu mensuel</h3><p class="sub">Septembre 2026 · '+esc(convs[S.set.conv])+' · jours '+(S.set.count==="ouvres"?"ouvrés":"ouvrables")+'</p></div><span class="tag '+(R.sent?"ok":"p")+'">'+(R.sent?"Envoyé":"Prêt à envoyer")+"</span></div>";
+    h+=reportHtml();
+    h+='<div class="sendbox"><label class="sub" for="rto">Adresse e-mail de votre comptable</label><div class="sendrow"><input id="rto" type="email" value="'+esc(R.to)+'"><button type="button" class="btn primary sm" data-act="sendrep">Envoyer au comptable</button></div>'+
+      '<label class="chk"><input type="checkbox" data-act="auto"'+(R.auto?" checked":"")+"> Envoyer automatiquement chaque mois</label>";
+    if(R.err){h+='<div class="note">'+esc(R.err)+"</div>";}
+    else if(R.sent){h+='<div class="note">Compte rendu de septembre 2026 envoyé à '+esc(R.sent)+".</div>";}
+    h+='<p class="sub" style="margin-top:12px">Démo : aucun e-mail n’est réellement envoyé.</p></div>';
+    return h;
+  }
+  function seg(k,opts){
+    return '<div class="switch" role="group">'+opts.map(function(o){return '<button type="button" aria-pressed="'+(S.set[k]===o[0])+'" data-act="set" data-k="'+k+'" data-v="'+o[0]+'">'+o[1]+"</button>";}).join("")+"</div>";
+  }
+  function pSettings(){
+    var opts=Object.keys(convs).map(function(k){return '<option value="'+k+'"'+(S.set.conv===k?" selected":"")+">"+esc(convs[k])+"</option>";}).join("");
+    return '<div class="ph"><div><h3>Réglages</h3><p class="sub">Les règles de votre convention collective, appliquées aux congés et au compte rendu</p></div></div>'+
+      '<label class="sub" for="cv">Convention collective</label><select id="cv" class="sel">'+opts+"</select>"+
+      '<div style="margin-top:18px">'+
+      '<div class="rule"><div><b>Décompte des congés</b><span class="sub">Change le nombre de jours acquis chaque mois (2,5 ouvrables, 2,08 ouvrés) et les jours décomptés à chaque demande.</span></div>'+seg("count",[["ouvrables","Jours ouvrables"],["ouvres","Jours ouvrés"]])+"</div>"+
+      '<div class="rule"><div><b>Période de référence des congés</b><span class="sub">Date à laquelle les compteurs repartent à zéro.</span></div>'+seg("ref",[["jun","1er juin – 31 mai"],["jan","1er janvier – 31 décembre"]])+"</div>"+
+      '<div class="rule"><div><b>Congés d’ancienneté</b><span class="sub">Jours supplémentaires prévus par certaines conventions.</span></div>'+seg("anc",[["none","Aucun"],["conv","Selon la convention"]])+"</div>"+
+      '<div class="rule"><div><b>Majoration des heures supplémentaires</b><span class="sub">Reprise dans le compte rendu du comptable.</span></div>'+seg("maj",[["legal","Règle légale"],["conv","Selon la convention"]])+"</div>"+
+      "</div>"+
+      '<div class="note">Vous choisissez et validez ces règles, votre comptable peut les vérifier avant le premier envoi. Elles s’appliquent ensuite automatiquement à tous vos salariés.</div>';
+  }
+  function threadsFor(){
+    return S.role==="admin"?[["team","Toute l’équipe","Annonces"],["dm","Léa","Message direct"]]:[["team","Toute l’équipe","Annonces"],["dm","Camille","Responsable"]];
+  }
+  function pMessages(){
+    var th=threadsFor(),cur=null;
+    var list=th.map(function(t){
+      if(t[0]===S.thread){cur=t;}
+      return '<button type="button" class="th'+(t[0]===S.thread?" on":"")+'" data-act="thread" data-v="'+t[0]+'">'+t[1]+"<small>"+t[2]+"</small></button>";
+    }).join("");
+    var b=S.msgs[S.thread].map(function(m){
+      var mine=m.f===S.role;
+      return '<div class="bb'+(mine?" me":"")+'">'+(mine?"":"<small>"+esc(m.n)+"</small>")+esc(m.t)+"</div>";
+    }).join("");
+    return '<div class="ph"><div><h3>Messages</h3><p class="sub">Messagerie interne, visible côté administrateur et côté salarié.</p></div></div>'+
+      '<div class="msg"><div class="threads">'+list+'</div><div class="conv"><div class="conv-h">'+cur[1]+'</div><div class="bubbles" id="bub">'+b+'</div>'+
+      '<form class="compose" id="cf" autocomplete="off"><input id="ci" type="text" placeholder="Écrire un message…" aria-label="Votre message"><button type="submit" class="btn primary sm">Envoyer</button></form></div></div>';
+  }
+
+  function render(){
+    $("side").innerHTML=side();
+    var h="";
+    if(S.tab==="planning"){h=S.role==="admin"?pAdminPlanning():pEmpPlanning();}
+    else if(S.tab==="equipe"){h=pEquipe();}
+    else if(S.tab==="compte"){h=pReport();}
+    else if(S.tab==="reglages"){h=pSettings();}
+    else if(S.tab==="conges"){h=S.role==="admin"?pAdminLeaves():pEmpLeaves();}
+    else{h=pMessages();}
+    $("main").innerHTML=h;
+    $("r-admin").setAttribute("aria-pressed",S.role==="admin");
+    $("r-emp").setAttribute("aria-pressed",S.role==="emp");
+    var b=$("bub");
+    if(b){b.scrollTop=b.scrollHeight;}
+    if(S.focus&&$("ci")){$("ci").focus({preventScroll:true});}
+    S.focus=false;
+  }
+  function setRole(r){
+    S.role=r;
+    if(r==="emp"&&S.tab==="equipe"){S.tab="planning";}
+    S.sent=(r==="emp")?S.sent:null;
+    render();
+  }
+
+  $("r-admin").addEventListener("click",function(){setRole("admin");});
+  $("r-emp").addEventListener("click",function(){setRole("emp");});
+  $("demo").addEventListener("click",function(e){
+    var t=e.target.closest("[data-act]");
+    if(!t){return;}
+    var a=t.getAttribute("data-act"),v=t.getAttribute("data-v");
+    if(a==="tab"){S.tab=v;}
+    else if(a==="publish"){S.published=!S.published;}
+    else if(a==="sel"){S.sel=parseInt(v,10);}
+    else if(a==="leave"){S.leaves[parseInt(t.getAttribute("data-i"),10)].st=v;}
+    else if(a==="day"){
+      var d=parseInt(v,10);
+      S.sent=null;
+      if(S.rs===null||S.re!==null){S.rs=d;S.re=null;}
+      else if(d<S.rs){S.rs=d;}
+      else{S.re=d;}
+    }
+    else if(a==="send"){
+      if(S.rs===null){return;}
+      var n=span(),lbl=rangeLabel();
+      S.leaves.push({who:"Léa",label:lbl,days:n,st:"p"});
+      S.sent=lbl;S.rs=null;S.re=null;
+    }
+    else if(a==="thread"){S.thread=v;}
+    else if(a==="auto"){S.report.auto=!S.report.auto;}
+    else if(a==="set"){S.set[t.getAttribute("data-k")]=v;S.rs=null;S.re=null;}
+    else if(a==="sendrep"){
+      var to=($("rto").value||"").trim();
+      S.report.to=to;
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)){S.report.err="Adresse e-mail invalide : vérifiez-la puis réessayez.";}
+      else{S.report.err=null;S.report.sent=to;}
+    }
+    else if(a==="role"){S.role=v;S.tab="conges";S.sent=null;}
+    render();
+  });
+  $("demo").addEventListener("change",function(e){
+    if(e.target.id==="cv"){S.set.conv=e.target.value;render();}
+  });
+  $("demo").addEventListener("submit",function(e){
+    if(e.target.id!=="cf"){return;}
+    e.preventDefault();
+    var i=$("ci"),txt=i.value.trim();
+    if(!txt){return;}
+    var now=new Date(),hh=("0"+now.getHours()).slice(-2)+":"+("0"+now.getMinutes()).slice(-2);
+    S.msgs[S.thread].push({f:S.role,n:S.role==="admin"?"Camille":"Léa",t:txt,h:hh});
+    S.focus=true;
+    render();
+  });
+  $("rep-static").innerHTML=reportHtml();
+  render();
+})();
 </script>
-</body>
-</html>
+
+<script type="module">
+import { initializeApp } from "https://cdn.jsdelivr.net/npm/firebase@10.13.0/app/+esm";
+import {
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail,
+  onAuthStateChanged, signOut
+} from "https://cdn.jsdelivr.net/npm/firebase@10.13.0/auth/+esm";
+import {
+  getFirestore, doc, setDoc, getDoc, getDocs, updateDoc, serverTimestamp,
+  collection, addDoc, deleteDoc, onSnapshot, orderBy, query, where
+} from "https://cdn.jsdelivr.net/npm/firebase@10.13.0/firestore/+esm";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDcs1ReK7UQ6G5uStfAZ_F-W5AUXrzCedA",
+  authDomain: "lety-a1714.firebaseapp.com",
+  projectId: "lety-a1714",
+  storageBucket: "lety-a1714.firebasestorage.app",
+  messagingSenderId: "490488357552",
+  appId: "1:490488357552:web:5fdce13ef6628f8ba49175"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
+
+const PLAN_LABEL = { essentiel: "Essentiel", equipe: "Équipe", reseau: "Réseau" };
+const STRIPE_LINKS = {
+  essentiel: "https://buy.stripe.com/test_14A5kD5Pz8Xe4jUb6CbjW00",
+  equipe: "https://buy.stripe.com/test_9B64gz1zja1idUu7UqbjW01",
+  reseau: "https://buy.stripe.com/test_9B66oHgudflC9Ee2A6bjW02"
+};
+function stripeUrl(plan, email, uid) {
+  var base = STRIPE_LINKS[plan];
+  if (!base) { return null; }
+  var url = new URL(base);
+  if (email) { url.searchParams.set("prefilled_email", email); }
+  if (uid) { url.searchParams.set("client_reference_id", uid); }
+  return url.toString();
+}
+
+/* Code entreprise : identifiant court à donner aux salariés pour qu'ils retrouvent
+   la bonne entreprise depuis l'Espace Collaborateur (pas besoin d'e-mail). */
+function makeCompanyCode(company) {
+  var base = (company || "LETY").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 4);
+  if (!base) { base = "LETY"; }
+  var num = Math.floor(100 + Math.random() * 900);
+  return base + num;
+}
+
+function esc(t){return String(t).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];});}
+
+(function () {
+  var ov = document.getElementById("auth-ov");
+  var box = ov.querySelector(".auth-box");
+  var tabs = ov.querySelectorAll(".auth-tab");
+  var title = document.getElementById("auth-title");
+  var sub = document.getElementById("auth-sub");
+  var fldCompany = document.getElementById("fld-company");
+  var fldPlan = document.getElementById("fld-plan");
+  var planSel = document.getElementById("a-plan");
+  var submitBtn = document.getElementById("auth-submit");
+  var fine = document.getElementById("auth-fine");
+  var note = document.getElementById("auth-note");
+  var form = document.getElementById("auth-form");
+  var forgotBtn = document.getElementById("auth-forgot");
+  var mode = "signup";
+
+  function setMode(m) {
+    mode = m;
+    tabs.forEach(function (t) { t.classList.toggle("on", t.dataset.mode === m); });
+    note.hidden = true;
+    if (m === "signup") {
+      title.textContent = "Créer votre espace";
+      sub.textContent = "Vous devenez administrateur de votre entreprise sur Lety.";
+      fldCompany.style.display = ""; fldPlan.style.display = "";
+      submitBtn.textContent = "Créer mon espace";
+      fine.style.display = "";
+      forgotBtn.style.display = "none";
+    } else {
+      title.textContent = "Se connecter";
+      sub.textContent = "Retrouvez votre espace administrateur ou salarié.";
+      fldCompany.style.display = "none"; fldPlan.style.display = "none";
+      submitBtn.textContent = "Se connecter";
+      fine.style.display = "none";
+      forgotBtn.style.display = "block";
+    }
+  }
+
+  var panelEntreprise = document.getElementById("auth-panel-entreprise");
+  var panelCollab = document.getElementById("auth-panel-collab");
+  var empLoginNote = document.getElementById("emp-login-note");
+
+  function showPanel(p) {
+    panelEntreprise.hidden = p !== "entreprise";
+    panelCollab.hidden = p !== "collab";
+  }
+
+  function openAuth(m, plan) {
+    note.hidden = true;
+    empLoginNote.hidden = true;
+    if (m === "collab") {
+      showPanel("collab");
+    } else {
+      showPanel("entreprise");
+      setMode(m || "signup");
+      if (plan && PLAN_LABEL[plan]) { planSel.value = plan; }
+    }
+    ov.hidden = false;
+    document.body.style.overflow = "hidden";
+    setTimeout(function () {
+      if (m === "collab") { document.getElementById("el-code").focus(); }
+      else { document.getElementById(mode === "signup" ? "a-company" : "a-email").focus(); }
+    }, 30);
+  }
+  function closeAuth() {
+    ov.hidden = true;
+    document.body.style.overflow = "";
+    note.hidden = true;
+    empLoginNote.hidden = true;
+  }
+
+  document.querySelectorAll("[data-auth]").forEach(function (el) {
+    el.addEventListener("click", function (e) {
+      e.preventDefault();
+      openAuth(el.dataset.auth, el.dataset.plan);
+    });
+  });
+  document.getElementById("auth-close").addEventListener("click", closeAuth);
+  ov.addEventListener("click", function (e) { if (e.target === ov) { closeAuth(); } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !ov.hidden) { closeAuth(); } });
+  tabs.forEach(function (t) { t.addEventListener("click", function () { setMode(t.dataset.mode); }); });
+  document.getElementById("switch-to-collab").addEventListener("click", function () { openAuth("collab"); });
+  document.getElementById("switch-to-entreprise").addEventListener("click", function () { openAuth("login"); });
+
+  function showNote(msg, ok) {
+    note.textContent = msg;
+    note.className = "auth-note" + (ok ? " ok" : "");
+    note.hidden = false;
+  }
+  function showNoteHtml(html, ok) {
+    note.innerHTML = html;
+    note.className = "auth-note" + (ok ? " ok" : "");
+    note.hidden = false;
+  }
+  function successMsg(plan, email, uid) {
+    var url = stripeUrl(plan, email, uid);
+    var base = "Compte créé (offre " + PLAN_LABEL[plan] + "). ";
+    if (url) {
+      return base + 'Dernière étape : <a href="' + url + '" target="_blank" rel="noopener" style="color:inherit;font-weight:800;text-decoration:underline">réglez votre abonnement ici</a>.';
+    }
+    return base + "Le lien de paiement pour cette offre n’est pas encore branché — vous serez contacté pour finaliser l’abonnement.";
+  }
+
+  function friendlyError(err) {
+    var c = err && err.code;
+    if (c === "auth/email-already-in-use") { return "Un compte existe déjà avec cet e-mail. Essayez de vous connecter."; }
+    if (c === "auth/invalid-email") { return "Adresse e-mail invalide."; }
+    if (c === "auth/weak-password") { return "Le mot de passe doit faire au moins 6 caractères."; }
+    if (c === "auth/user-not-found" || c === "auth/wrong-password" || c === "auth/invalid-credential") { return "E-mail ou mot de passe incorrect."; }
+    if (c === "permission-denied") { return "Compte créé, mais Firestore refuse l’écriture (permission-denied) : vérifiez les règles Firestore dans la console (onglet Règles), publiées, sans erreur de syntaxe."; }
+    console.error("Lety auth/firestore error:", err);
+    return "Erreur : " + (c || (err && err.message) || "inconnue") + ". (détail dans la console du navigateur, touche F12)";
+  }
+
+  /* ---------- Connexion Espace Collaborateur (identifiant + mot de passe, sans compte Firebase) ---------- */
+  var empLoginForm = document.getElementById("emp-login-form");
+  var empLoginSubmit = document.getElementById("emp-login-submit");
+  empLoginForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var code = document.getElementById("el-code").value.trim().toUpperCase();
+    var loginId = document.getElementById("el-id").value.trim().toLowerCase();
+    var pass = document.getElementById("el-pass").value.trim();
+    empLoginSubmit.disabled = true;
+    empLoginNote.hidden = true;
+
+    function fail(msg) {
+      empLoginNote.textContent = msg;
+      empLoginNote.className = "auth-note";
+      empLoginNote.hidden = false;
+      empLoginSubmit.disabled = false;
+    }
+
+    getDoc(doc(db, "companyCodes", code)).then(function (codeSnap) {
+      if (!codeSnap.exists()) { fail("Code entreprise introuvable. Vérifiez-le auprès de votre employeur."); return; }
+      var companyId = codeSnap.data().companyId;
+      var q = query(collection(db, "companies", companyId, "employees"), where("loginId", "==", loginId));
+      getDocs(q).then(function (snap) {
+        var match = null;
+        snap.forEach(function (d) { if (d.data().loginPass === pass) { match = { id: d.id, data: d.data() }; } });
+        if (!match) { fail("Identifiant ou mot de passe incorrect."); return; }
+        empLoginSubmit.disabled = false;
+        enterEmployeeApp(companyId, match.id, match.data);
+      }).catch(function (err) { fail(friendlyError(err)); });
+    }).catch(function (err) { fail(friendlyError(err)); });
+  });
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var email = document.getElementById("a-email").value.trim();
+    var pass = document.getElementById("a-pass").value;
+    submitBtn.disabled = true;
+    note.hidden = true;
+
+    if (mode === "signup") {
+      var company = document.getElementById("a-company").value.trim();
+      var plan = planSel.value;
+      var uid = null;
+      var companyData = null;
+      var code = makeCompanyCode(company);
+      createUserWithEmailAndPassword(auth, email, pass)
+        .then(function (cred) {
+          uid = cred.user.uid;
+          companyData = {
+            company: company,
+            plan: plan,
+            role: "admin",
+            ownerEmail: email,
+            createdAt: serverTimestamp(),
+            convention: null,
+            employees: [],
+            code: code
+          };
+          return setDoc(doc(db, "companies", cred.user.uid), companyData);
+        })
+        .then(function () {
+          return setDoc(doc(db, "companyCodes", code), { companyId: uid });
+        })
+        .then(function () {
+          enterApp(uid, companyData, successMsg(plan, email, uid));
+          submitBtn.disabled = false;
+        })
+        .catch(function (err) {
+          showNote(friendlyError(err));
+          submitBtn.disabled = false;
+        });
+    } else {
+      signInWithEmailAndPassword(auth, email, pass)
+        .then(function (cred) {
+          return getDoc(doc(db, "companies", cred.user.uid)).then(function (snap) {
+            if (snap.exists()) {
+              enterApp(cred.user.uid, snap.data());
+            } else {
+              showNote("Ce compte n’est pas un compte Entreprise. Utilisez l’Espace Collaborateur si vous êtes salarié.");
+            }
+            submitBtn.disabled = false;
+          });
+        })
+        .catch(function (err) {
+          showNote(friendlyError(err));
+          submitBtn.disabled = false;
+        });
+    }
+  });
+
+  forgotBtn.addEventListener("click", function () {
+    var email = document.getElementById("a-email").value.trim();
+    if (!email) { showNote("Entrez d’abord votre e-mail ci-dessus, puis cliquez à nouveau sur « Mot de passe oublié »."); return; }
+    forgotBtn.disabled = true;
+    sendPasswordResetEmail(auth, email)
+      .then(function () {
+        showNote("E-mail envoyé à " + email + " : suivez le lien qu’il contient pour choisir un nouveau mot de passe.", true);
+      })
+      .catch(function (err) {
+        showNote(friendlyError(err));
+      })
+      .finally(function () { forgotBtn.disabled = false; });
+  });
+
+  document.getElementById("auth-google").addEventListener("click", function () {
+    var googleBtn = this;
+    googleBtn.disabled = true;
+    note.hidden = true;
+    signInWithPopup(auth, googleProvider)
+      .then(function (cred) {
+        var ref = doc(db, "companies", cred.user.uid);
+        return getDoc(ref).then(function (snap) {
+          if (snap.exists()) {
+            enterApp(cred.user.uid, snap.data());
+            return;
+          }
+          var plan = planSel.value;
+          var gCode = makeCompanyCode(cred.user.displayName);
+          var data = {
+            company: (cred.user.displayName || "Mon entreprise") + " (à compléter)",
+            plan: plan,
+            role: "admin",
+            ownerEmail: cred.user.email,
+            createdAt: serverTimestamp(),
+            convention: null,
+            employees: [],
+            code: gCode
+          };
+          return setDoc(ref, data).then(function () {
+            return setDoc(doc(db, "companyCodes", gCode), { companyId: cred.user.uid });
+          }).then(function () {
+            enterApp(cred.user.uid, data, successMsg(plan, cred.user.email, cred.user.uid));
+          });
+        });
+      })
+      .catch(function (err) {
+        var c = err && err.code;
+        if (c === "auth/popup-closed-by-user") { showNote("Fenêtre Google fermée avant la fin."); }
+        else if (c === "auth/popup-blocked" || c === "auth/network-request-failed") { showNote("Le navigateur ou cette prévisualisation bloque la connexion à Google. Testez depuis le site une fois hébergé sur votre domaine (ou en local via « npx serve »)."); }
+        else { showNote(friendlyError(err)); }
+      })
+      .finally(function () { googleBtn.disabled = false; });
+  });
+
+  setMode("signup");
+
+  /* ---------- Application réelle (Équipe) ---------- */
+  var currentUid = null;
+  var unsubEmp = null;
+  var empList = document.getElementById("app-emp-list");
+  var empForm = document.getElementById("app-emp-form");
+  var empSubmit = document.getElementById("app-emp-submit");
+  var empNote = document.getElementById("app-emp-note");
+
+  function enterApp(uid, companyData, extraNoteHtml) {
+    closeAuth();
+    document.getElementById("marketing-wrap").style.display = "none";
+    document.getElementById("app-root").hidden = false;
+    document.getElementById("app-company").textContent = (companyData && companyData.company) || "";
+    if (extraNoteHtml) {
+      empNote.innerHTML = extraNoteHtml;
+      empNote.className = "auth-note ok";
+      empNote.hidden = false;
+    } else {
+      empNote.hidden = true;
+    }
+    if (companyData && companyData.code) {
+      showCompanyCode(companyData.code);
+    } else {
+      var newCode = makeCompanyCode(companyData && companyData.company);
+      setDoc(doc(db, "companies", uid), { code: newCode }, { merge: true })
+        .then(function () { return setDoc(doc(db, "companyCodes", newCode), { companyId: uid }); })
+        .then(function () { showCompanyCode(newCode); })
+        .catch(function () {});
+    }
+    loadEmployees(uid);
+    initPlanning(uid);
+  }
+  function showCompanyCode(code) {
+    var el = document.getElementById("app-company-code");
+    if (el) { el.textContent = "Code entreprise (à donner à vos salariés) : " + code; }
+  }
+  function exitApp() {
+    document.getElementById("app-root").hidden = true;
+    document.getElementById("marketing-wrap").style.display = "";
+    if (unsubEmp) { unsubEmp(); unsubEmp = null; }
+    if (unsubShifts) { unsubShifts(); unsubShifts = null; }
+    if (unsubConges) { unsubConges(); unsubConges = null; }
+    currentUid = null;
+  }
+
+  /* ---------- Onglets Planning / Équipe / Congés (admin) ---------- */
+  var viewPlanning = document.getElementById("app-view-planning");
+  var viewEquipe = document.getElementById("app-view-equipe");
+  var viewConges = document.getElementById("app-view-conges");
+  var tabPlanning = document.getElementById("app-tab-planning");
+  var tabEquipe = document.getElementById("app-tab-equipe");
+  var tabConges = document.getElementById("app-tab-conges");
+  function setAppTab(name) {
+    viewPlanning.hidden = name !== "planning";
+    viewEquipe.hidden = name !== "equipe";
+    viewConges.hidden = name !== "conges";
+    tabPlanning.classList.toggle("primary", name === "planning");
+    tabEquipe.classList.toggle("primary", name === "equipe");
+    tabConges.classList.toggle("primary", name === "conges");
+  }
+  tabPlanning.addEventListener("click", function () { setAppTab("planning"); });
+  tabEquipe.addEventListener("click", function () { setAppTab("equipe"); });
+  tabConges.addEventListener("click", function () { setAppTab("conges"); });
+
+  /* ---------- Espace salarié : état ---------- */
+  var empCompanyId = null;
+  var empEmployeeId = null;
+  var empName = "";
+  var empWeekOffset = 0;
+  var empAllShifts = [];
+  var unsubEmpShifts = null;
+  var unsubEmpConges = null;
+  var unsubConges = null;
+  var EMP_SESSION_KEY = "letyEmpSession";
+  function svEmpSession(s) { try { localStorage.setItem(EMP_SESSION_KEY, JSON.stringify(s)); } catch (e) {} }
+  function ldEmpSession() { try { var v = localStorage.getItem(EMP_SESSION_KEY); if (v) { return JSON.parse(v); } } catch (e) {} return null; }
+  function clEmpSession() { try { localStorage.removeItem(EMP_SESSION_KEY); } catch (e) {} }
+
+  var empViewPlanning = document.getElementById("emp-view-planning");
+  var empViewConges = document.getElementById("emp-view-conges");
+  var empTabPlanning = document.getElementById("emp-tab-planning");
+  var empTabConges = document.getElementById("emp-tab-conges");
+  function setEmpTab(name) {
+    empViewPlanning.hidden = name !== "planning";
+    empViewConges.hidden = name !== "conges";
+    empTabPlanning.classList.toggle("primary", name === "planning");
+    empTabConges.classList.toggle("primary", name === "conges");
+  }
+  empTabPlanning.addEventListener("click", function () { setEmpTab("planning"); });
+  empTabConges.addEventListener("click", function () { setEmpTab("conges"); });
+
+  function enterEmployeeApp(companyId, employeeId, employeeData) {
+    closeAuth();
+    document.getElementById("marketing-wrap").style.display = "none";
+    document.getElementById("app-root").hidden = true;
+    document.getElementById("emp-root").hidden = false;
+    empCompanyId = companyId;
+    empEmployeeId = employeeId;
+    empName = (employeeData && employeeData.name) || "";
+    empWeekOffset = 0;
+    setEmpTab("planning");
+    svEmpSession({ companyId: companyId, employeeId: employeeId });
+    document.getElementById("emp-name-title").textContent = empName ? "Bonjour " + empName : "Mon planning";
+    getDoc(doc(db, "companies", empCompanyId)).then(function (snap) {
+      document.getElementById("emp-company").textContent = (snap.exists() && snap.data().company) || "";
+    });
+    loadEmpShifts();
+    loadEmpConges();
+  }
+  function exitEmployeeApp() {
+    document.getElementById("emp-root").hidden = true;
+    document.getElementById("marketing-wrap").style.display = "";
+    if (unsubEmpShifts) { unsubEmpShifts(); unsubEmpShifts = null; }
+    if (unsubEmpConges) { unsubEmpConges(); unsubEmpConges = null; }
+    empCompanyId = null; empEmployeeId = null; empName = "";
+    clEmpSession();
+  }
+  document.getElementById("emp-logout").addEventListener("click", function () {
+    exitEmployeeApp();
+  });
+
+  var currentEmployees = [];
+
+  function renderEmpList(items) {
+    if (!items.length) {
+      empList.innerHTML = '<div class="fiche"><p class="sub">Aucun salarié pour l’instant. Ajoutez le premier avec le formulaire ci-contre.</p></div>';
+      return;
+    }
+    empList.innerHTML = items.map(function (it) {
+      var accessTag = it.loginId ? '<span class="tag ok">Identifiant : ' + esc(it.loginId) + '</span>' : '<span class="tag p">Pas d’accès</span>';
+      return '<div class="lv"><div><b>' + esc(it.name) + '</b><span class="sub">' + esc(it.role || "") +
+        (it.boutique ? " · " + esc(it.boutique) : "") + " · " + (it.hours || 35) + ' h/semaine</span></div>' +
+        '<div class="acts">' + accessTag + '<button type="button" class="btn sm" data-del="' + it.id + '">Supprimer</button></div></div>';
+    }).join("");
+  }
+
+  function loadEmployees(uid) {
+    currentUid = uid;
+    if (unsubEmp) { unsubEmp(); }
+    empList.innerHTML = '<div class="fiche"><p class="sub">Chargement…</p></div>';
+    var q = query(collection(db, "companies", uid, "employees"), orderBy("name"));
+    unsubEmp = onSnapshot(q, function (snap) {
+      var items = [];
+      snap.forEach(function (d) { items.push(Object.assign({ id: d.id }, d.data())); });
+      currentEmployees = items;
+      renderEmpList(items);
+      renderPlanGrid();
+    }, function (err) {
+      empList.innerHTML = '<div class="fiche"><p class="sub">Erreur de chargement : ' + esc(err.message || err.code || "inconnue") + '</p></div>';
+    });
+  }
+
+  empList.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-del]");
+    if (!btn || !currentUid) { return; }
+    if (!confirm("Supprimer ce salarié ?")) { return; }
+    deleteDoc(doc(db, "companies", currentUid, "employees", btn.getAttribute("data-del")))
+      .catch(function (err) { alert("Erreur : " + (err.message || err.code)); });
+  });
+
+  empForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!currentUid) { return; }
+    var name = document.getElementById("e-name").value.trim();
+    var role = document.getElementById("e-role").value.trim();
+    var boutique = document.getElementById("e-boutique").value.trim();
+    var hours = parseInt(document.getElementById("e-hours").value, 10) || 35;
+    var loginId = document.getElementById("e-loginid").value.trim().toLowerCase();
+    var loginPass = document.getElementById("e-loginpass").value.trim();
+    var adminUid = currentUid;
+    empSubmit.disabled = true;
+    empNote.hidden = true;
+
+    var data = { name: name, role: role, boutique: boutique, hours: hours, createdAt: serverTimestamp() };
+    if (loginId && loginPass) { data.loginId = loginId; data.loginPass = loginPass; }
+
+    addDoc(collection(db, "companies", adminUid, "employees"), data).then(function () {
+      empForm.reset();
+      document.getElementById("e-hours").value = 35;
+      empNote.hidden = true;
+    }).catch(function (err) {
+      empNote.textContent = "Erreur : " + (err.message || err.code || "inconnue");
+      empNote.className = "auth-note";
+      empNote.hidden = false;
+    }).finally(function () { empSubmit.disabled = false; });
+  });
+
+  document.getElementById("app-logout").addEventListener("click", function () {
+    signOut(auth).then(exitApp);
+  });
+
+  /* ---------- Planning réel (Firestore) ---------- */
+  var WEEKDAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+  var weekOffset = 0;
+  var unsubShifts = null;
+  var currentShifts = {}; // key: employeeId + "_" + dateISO -> shift data
+  var editingKey = null;
+
+  var planGrid = document.getElementById("app-plan-grid");
+  var weekLabel = document.getElementById("app-week-label");
+  var shiftEditor = document.getElementById("app-shift-editor");
+  var shiftTitle = document.getElementById("app-shift-title");
+  var shiftStart = document.getElementById("sh-start");
+  var shiftEnd = document.getElementById("sh-end");
+  var shiftBoutique = document.getElementById("sh-boutique");
+  var shiftNote = document.getElementById("app-shift-note");
+  var shiftSave = document.getElementById("app-shift-save");
+  var shiftDelete = document.getElementById("app-shift-delete");
+  var shiftCancel = document.getElementById("app-shift-cancel");
+
+  function pad2(n) { return n < 10 ? "0" + n : String(n); }
+  function toISO(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
+  function fmtDate(d) { return pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1); }
+  function weekDates() {
+    var now = new Date();
+    var day = now.getDay(); // 0=dim
+    var mondayOffset = day === 0 ? -6 : 1 - day;
+    var monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset + weekOffset * 7);
+    var out = [];
+    for (var i = 0; i < 7; i++) { out.push(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i)); }
+    return out;
+  }
+
+  function shiftKey(empId, dateISO) { return empId + "_" + dateISO; }
+
+  function renderPlanGrid() {
+    if (!currentUid) { return; }
+    var dates = weekDates();
+    weekLabel.textContent = "Du " + fmtDate(dates[0]) + " au " + fmtDate(dates[6]) + (weekOffset === 0 ? " (semaine en cours)" : "");
+
+    if (!currentEmployees.length) {
+      planGrid.innerHTML = '<div class="fiche"><p class="sub">Ajoutez d’abord des salariés dans l’onglet Équipe pour construire le planning.</p></div>';
+      return;
+    }
+
+    var h = '<div class="pl"><div class="h">Équipe</div>';
+    dates.forEach(function (d) { h += '<div class="h">' + WEEKDAYS[d.getDay() === 0 ? 6 : d.getDay() - 1].slice(0, 3) + " " + fmtDate(d) + "</div>"; });
+
+    currentEmployees.forEach(function (emp) {
+      h += '<div class="who"><i>' + esc((emp.name || "?").charAt(0)) + '</i>' + esc(emp.name) + "</div>";
+      dates.forEach(function (d) {
+        var iso = toISO(d);
+        var key = shiftKey(emp.id, iso);
+        var sh = currentShifts[key];
+        if (sh) {
+          h += '<div><div class="shift a" data-cell="' + key + '" data-emp="' + emp.id + '" data-date="' + iso + '" style="cursor:pointer">' +
+            esc(sh.start) + '–' + esc(sh.end) + (sh.boutique ? "<small>" + esc(sh.boutique) + "</small>" : "") + "</div></div>";
+        } else {
+          h += '<div><button type="button" class="btn sm ghost" data-cell="' + key + '" data-emp="' + emp.id + '" data-date="' + iso + '" style="width:100%">+</button></div>';
+        }
+      });
+    });
+    h += "</div>";
+    planGrid.innerHTML = h;
+  }
+
+  planGrid.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-cell]");
+    if (!el) { return; }
+    openShiftEditor(el.getAttribute("data-emp"), el.getAttribute("data-date"));
+  });
+
+  function openShiftEditor(empId, dateISO) {
+    var key = shiftKey(empId, dateISO);
+    editingKey = key;
+    var emp = currentEmployees.filter(function (x) { return x.id === empId; })[0];
+    var sh = currentShifts[key];
+    var d = new Date(dateISO + "T00:00:00");
+    shiftTitle.textContent = (emp ? emp.name : "Salarié") + " · " + fmtDate(d);
+    shiftStart.value = sh ? sh.start : "09:00";
+    shiftEnd.value = sh ? sh.end : "17:00";
+    shiftBoutique.value = sh ? (sh.boutique || "") : (emp && emp.boutique) || "";
+    shiftDelete.hidden = !sh;
+    shiftNote.hidden = true;
+    shiftEditor.hidden = false;
+    shiftEditor.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  function closeShiftEditor() {
+    shiftEditor.hidden = true;
+    editingKey = null;
+  }
+  shiftCancel.addEventListener("click", closeShiftEditor);
+
+  shiftSave.addEventListener("click", function () {
+    if (!editingKey || !currentUid) { return; }
+    var parts = editingKey.split("_");
+    var empId = parts[0], dateISO = parts.slice(1).join("_");
+    var start = shiftStart.value, end = shiftEnd.value, boutique = shiftBoutique.value.trim();
+    if (!start || !end) {
+      shiftNote.textContent = "Indiquez une heure de début et de fin.";
+      shiftNote.className = "auth-note";
+      shiftNote.hidden = false;
+      return;
+    }
+    shiftSave.disabled = true;
+    setDoc(doc(db, "companies", currentUid, "shifts", editingKey), {
+      employeeId: empId, date: dateISO, start: start, end: end, boutique: boutique, updatedAt: serverTimestamp()
+    }).then(function () {
+      closeShiftEditor();
+    }).catch(function (err) {
+      shiftNote.textContent = "Erreur : " + (err.message || err.code || "inconnue");
+      shiftNote.className = "auth-note";
+      shiftNote.hidden = false;
+    }).finally(function () { shiftSave.disabled = false; });
+  });
+
+  shiftDelete.addEventListener("click", function () {
+    if (!editingKey || !currentUid) { return; }
+    deleteDoc(doc(db, "companies", currentUid, "shifts", editingKey))
+      .then(closeShiftEditor)
+      .catch(function (err) { alert("Erreur : " + (err.message || err.code)); });
+  });
+
+  document.getElementById("app-week-prev").addEventListener("click", function () { weekOffset--; loadShifts(); });
+  document.getElementById("app-week-next").addEventListener("click", function () { weekOffset++; loadShifts(); });
+
+  function loadShifts() {
+    if (!currentUid) { return; }
+    if (unsubShifts) { unsubShifts(); }
+    var dates = weekDates();
+    var startISO = toISO(dates[0]), endISO = toISO(dates[6]);
+    var q = query(collection(db, "companies", currentUid, "shifts"), where("date", ">=", startISO), where("date", "<=", endISO));
+    unsubShifts = onSnapshot(q, function (snap) {
+      var map = {};
+      snap.forEach(function (d) { map[d.id] = d.data(); });
+      currentShifts = map;
+      renderPlanGrid();
+    }, function (err) {
+      planGrid.innerHTML = '<div class="fiche"><p class="sub">Erreur de chargement du planning : ' + esc(err.message || err.code || "inconnue") + "</p></div>";
+    });
+  }
+
+  function initPlanning(uid) {
+    weekOffset = 0;
+    setAppTab("planning");
+    loadShifts();
+    renderPlanGrid();
+    loadConges();
+  }
+
+  /* ---------- Congés : vue administrateur ---------- */
+  var congesList = document.getElementById("app-conges-list");
+
+  function renderCongesList(items) {
+    if (!items.length) {
+      congesList.innerHTML = '<div class="fiche"><p class="sub">Aucune demande de congés pour le moment.</p></div>';
+      return;
+    }
+    congesList.innerHTML = items.map(function (it) {
+      var tag = it.status === "approved" ? '<span class="tag ok">Validé</span>' : (it.status === "refused" ? '<span class="tag no">Refusé</span>' : '<span class="tag p">En attente</span>');
+      var acts = it.status === "pending"
+        ? '<button type="button" class="btn sm primary" data-leave="' + it.id + '" data-v="approved">Valider</button><button type="button" class="btn sm" data-leave="' + it.id + '" data-v="refused">Refuser</button>'
+        : "";
+      return '<div class="lv"><div><b>' + esc(it.employeeName || "Salarié") + '</b><span class="sub">Du ' + esc(it.startDate) + ' au ' + esc(it.endDate) +
+        (it.note ? " · " + esc(it.note) : "") + '</span></div><div class="acts">' + tag + acts + "</div></div>";
+    }).join("");
+  }
+
+  function loadConges() {
+    if (!currentUid) { return; }
+    if (unsubConges) { unsubConges(); }
+    var q = query(collection(db, "companies", currentUid, "leaveRequests"), orderBy("createdAt", "desc"));
+    unsubConges = onSnapshot(q, function (snap) {
+      var items = [];
+      snap.forEach(function (d) { items.push(Object.assign({ id: d.id }, d.data())); });
+      renderCongesList(items);
+    }, function (err) {
+      congesList.innerHTML = '<div class="fiche"><p class="sub">Erreur : ' + esc(err.message || err.code || "inconnue") + "</p></div>";
+    });
+  }
+
+  congesList.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-leave]");
+    if (!btn || !currentUid) { return; }
+    updateDoc(doc(db, "companies", currentUid, "leaveRequests", btn.getAttribute("data-leave")), { status: btn.getAttribute("data-v") })
+      .catch(function (err) { alert("Erreur : " + (err.message || err.code)); });
+  });
+
+  /* ---------- Planning et congés : vue salarié (lecture seule + demandes) ---------- */
+  function empWeekDates() {
+    var now = new Date();
+    var day = now.getDay();
+    var mondayOffset = day === 0 ? -6 : 1 - day;
+    var monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset + empWeekOffset * 7);
+    var out = [];
+    for (var i = 0; i < 7; i++) { out.push(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i)); }
+    return out;
+  }
+
+  function renderEmpPlanList() {
+    var dates = empWeekDates();
+    var startISO = toISO(dates[0]), endISO = toISO(dates[6]);
+    document.getElementById("emp-week-label").textContent = "Du " + fmtDate(dates[0]) + " au " + fmtDate(dates[6]) + (empWeekOffset === 0 ? " (semaine en cours)" : "");
+    var byDate = {};
+    empAllShifts.forEach(function (s) { if (s.date >= startISO && s.date <= endISO) { byDate[s.date] = s; } });
+    var h = "";
+    dates.forEach(function (d) {
+      var iso = toISO(d);
+      var sh = byDate[iso];
+      h += '<div class="dr"><span class="d">' + WEEKDAYS[d.getDay() === 0 ? 6 : d.getDay() - 1] + " " + fmtDate(d) + "</span>" +
+        (sh ? '<span class="shift a">' + esc(sh.start) + "–" + esc(sh.end) + (sh.boutique ? "<small>" + esc(sh.boutique) + "</small>" : "") + "</span>" : '<span class="rest">Repos</span>') + "</div>";
+    });
+    document.getElementById("emp-plan-list").innerHTML = h;
+  }
+
+  function loadEmpShifts() {
+    if (!empCompanyId || !empEmployeeId) { return; }
+    if (unsubEmpShifts) { unsubEmpShifts(); }
+    document.getElementById("emp-plan-list").innerHTML = '<p class="sub">Chargement…</p>';
+    var q = query(collection(db, "companies", empCompanyId, "shifts"), where("employeeId", "==", empEmployeeId));
+    unsubEmpShifts = onSnapshot(q, function (snap) {
+      var items = [];
+      snap.forEach(function (d) { items.push(d.data()); });
+      empAllShifts = items;
+      renderEmpPlanList();
+    }, function (err) {
+      document.getElementById("emp-plan-list").innerHTML = '<p class="sub">Erreur : ' + esc(err.message || err.code || "inconnue") + "</p>";
+    });
+  }
+  document.getElementById("emp-week-prev").addEventListener("click", function () { empWeekOffset--; renderEmpPlanList(); });
+  document.getElementById("emp-week-next").addEventListener("click", function () { empWeekOffset++; renderEmpPlanList(); });
+
+  var empCongesList = document.getElementById("emp-conges-list");
+  var empCongesForm = document.getElementById("emp-conges-form");
+  var empCongesSubmit = document.getElementById("emp-conges-submit");
+  var empCongesNote = document.getElementById("emp-conges-note");
+
+  function renderEmpCongesList(items) {
+    if (!items.length) {
+      empCongesList.innerHTML = '<div class="fiche"><p class="sub">Aucune demande envoyée pour le moment.</p></div>';
+      return;
+    }
+    empCongesList.innerHTML = items.map(function (it) {
+      var tag = it.status === "approved" ? '<span class="tag ok">Validé</span>' : (it.status === "refused" ? '<span class="tag no">Refusé</span>' : '<span class="tag p">En attente</span>');
+      return '<div class="lv"><div><b>Du ' + esc(it.startDate) + ' au ' + esc(it.endDate) + '</b>' +
+        (it.note ? '<span class="sub">' + esc(it.note) + "</span>" : "") + '</div><div class="acts">' + tag + "</div></div>";
+    }).join("");
+  }
+
+  function loadEmpConges() {
+    if (!empCompanyId || !empEmployeeId) { return; }
+    if (unsubEmpConges) { unsubEmpConges(); }
+    var q = query(collection(db, "companies", empCompanyId, "leaveRequests"), where("employeeId", "==", empEmployeeId));
+    unsubEmpConges = onSnapshot(q, function (snap) {
+      var items = [];
+      snap.forEach(function (d) { items.push(Object.assign({ id: d.id }, d.data())); });
+      items.sort(function (a, b) { return (b.startDate || "").localeCompare(a.startDate || ""); });
+      renderEmpCongesList(items);
+    }, function (err) {
+      empCongesList.innerHTML = '<div class="fiche"><p class="sub">Erreur : ' + esc(err.message || err.code || "inconnue") + "</p></div>";
+    });
+  }
+
+  empCongesForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!empCompanyId || !empEmployeeId) { return; }
+    var start = document.getElementById("c-start").value;
+    var end = document.getElementById("c-end").value;
+    var note = document.getElementById("c-note").value.trim();
+    if (!start || !end) { return; }
+    empCongesSubmit.disabled = true;
+    empCongesNote.hidden = true;
+    addDoc(collection(db, "companies", empCompanyId, "leaveRequests"), {
+      employeeId: empEmployeeId, employeeName: empName || "",
+      startDate: start, endDate: end, note: note, status: "pending", createdAt: serverTimestamp()
+    }).then(function () {
+      empCongesForm.reset();
+    }).catch(function (err) {
+      empCongesNote.textContent = "Erreur : " + (err.message || err.code || "inconnue");
+      empCongesNote.className = "auth-note";
+      empCongesNote.hidden = false;
+    }).finally(function () { empCongesSubmit.disabled = false; });
+  });
+
+  var autoEntered = false;
+  var empSess = ldEmpSession();
+  if (empSess && empSess.companyId && empSess.employeeId) {
+    getDoc(doc(db, "companies", empSess.companyId, "employees", empSess.employeeId)).then(function (snap) {
+      if (snap.exists()) { enterEmployeeApp(empSess.companyId, empSess.employeeId, snap.data()); }
+      else { clEmpSession(); }
+    });
+  } else {
+    onAuthStateChanged(auth, function (user) {
+      if (user && !autoEntered) {
+        autoEntered = true;
+        getDoc(doc(db, "companies", user.uid)).then(function (snap) {
+          if (snap.exists()) { enterApp(user.uid, snap.data()); }
+        });
+      }
+    });
+  }
+})();
+</script>
+</body></html>
